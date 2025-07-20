@@ -1,0 +1,40 @@
+package:
+  name: bootupd
+  version: 0.2.28
+  epoch: 0
+  description: Distribution-independent updates for bootloaders
+  target-architecture:
+    - x86_64
+  copyright:
+    - license: Apache-2.0-only
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - /work/melange.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+      - /work/output/packages
+    packages:
+      - busybox
+      - build-base
+      - cargo-auditable
+      - rust
+      - zstd-dev
+      - openssl-dev
+      - glib-dev
+      - ostree-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/coreos/bootupd.git
+      tag: v${{ package.version }}
+      expected-commit: 766bb80cbe22bcaba3f4c466385bf38d089f2917
+
+  - runs: |
+      cargo auditable build --release --locked
+      make install DESTDIR=${{targets.destdir}}
+
+  - uses: strip

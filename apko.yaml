@@ -1,0 +1,27 @@
+contents:
+  repositories:
+    - https://packages.wolfi.dev/os
+    - /work/output/packages
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    - /work/melange.rsa.pub
+  packages:
+    - ca-certificates-bundle
+    - wolfi-base
+    - kernel-uki
+    - systemd
+    - bootc
+    - bootupd
+    - ostree
+    - podman
+    - bash
+    - coreutils
+    - merged-bin
+    - file
+
+archs:
+  - x86_64
+
+layering:
+  strategy: origin
+  budget: 50
