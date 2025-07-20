@@ -1,0 +1,71 @@
+package:
+  name: dracut
+  version: 107
+  epoch: 0
+  description: Initramfs generator using udev
+  target-architecture:
+    - x86_64
+  copyright:
+    - license: GPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only
+  dependencies:
+    runtime:
+      - udev
+      - coreutils
+      - cpio
+      - findmnt
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+    packages:
+      # - busybox
+      - build-base
+      - wolfi-baselayout
+      - autoconf
+      - automake
+      - bash
+      - kmod-dev
+      - pkgconf
+      - rust
+      - coreutils
+      - systemd-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/dracut-ng/dracut-ng.git
+      tag: ${{package.version}}
+      expected-commit: 279da16f1b8fcca27d41937967c4e8f4c295086a
+
+  - runs: |
+      mkdir -p ${{targets.destdir}}/usr/lib/systemd/system
+      mkdir -p ${{targets.destdir}}/usr/share/bash-completion/completions
+      mkdir -p ${{targets.destdir}}/usr/lib
+
+  - uses: autoconf/configure
+    with:
+      opts: |
+        --sysconfdir=/etc \
+        --prefix=/usr \
+        --libdir=/usr/lib \
+        --systemdsystemunitdir=/usr/lib/systemd \
+        --enable-dracut-cpio
+
+  - uses: autoconf/make-install
+    with:
+      opts: |
+        enable_documentation=no
+
+  - uses: strip
+
+subpackages:
+  - name: dracut-dev
+    description: Headers and dev libraries from Dracut
+    pipeline:
+      - uses: split/dev
+    dependencies:
+      runtime:
+        - dracut

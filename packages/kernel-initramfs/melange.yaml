@@ -1,0 +1,41 @@
+package:
+  name: kernel-initramfs
+  version: 6.15.6
+  epoch: 1
+  description: The Linux kernel initramfs
+  target-architecture:
+    - x86_64
+  copyright:
+    - license: GPL-2.0
+  dependencies:
+    runtime:
+      - kernel-core
+      - kernel-modules
+      - kernel-initramfs
+      - zstd
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - ./melange.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+      - ./output/packages
+    packages:
+      - busybox
+      - build-base
+      - binutils-dev
+      - wolfi-baselayout
+      - kernel-core
+      - kernel-modules
+      - dracut
+      - kmod
+      - zstd
+      - posix-libc-utils
+
+pipeline:
+  - runs: |
+      mkdir -p /var/tmp
+      depmod ${{package.version}}
+      dracut --force --no-hostonly --reproducible --zstd --verbose --kver ${{package.version}} /usr/lib/modules/${{package.version}}/initramfs.img
