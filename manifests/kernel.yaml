@@ -5,6 +5,10 @@ package:
   description: The Linux kernel
   copyright:
     - license: GPL-2.0
+  dependencies:
+    runtime:
+      - kernel-core
+      - kernel-modules
 
 environment:
   contents:
@@ -30,38 +34,41 @@ environment:
       - openssl
 
 pipeline:
-  - uses: fetch
+  - uses: git-checkout
     with:
-      uri: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{package.version}}.tar.xz
-      expected-sha256: 2bb586c954277d070c8fdf6d7275faa93b4807d9bf3353b491d8149cca02b4fc
+      repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
+      tag: v${{package.version}}
+      expected-commit: 1562d948232546cfad45a1beddc70fe0c7b34950
 
-  - runs: |
-      make prepare
-      make modules_prepare
+  - uses: autoconf/make
+    with:
+      opts: prepare
 
-  - runs: |
-      make -j$(nproc)
+  - uses: autoconf/make
+    with:
+      opts: modules_prepare
+
+  - uses: autoconf/make
 
 subpackages:
   - name: kernel-core
-    description: The Linux kernel
+    description: The Linux kernel core
     pipeline:
       - runs: |
-          kernel_version=$(make kernelversion)
-          mkdir -p ${{targets.subpkgdir}}/usr/lib/${kernel_version}
-          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${kernel_version}/vmlinuz
-          cp System.map ${{targets.subpkgdir}}/usr/lib/${kernel_version}/System.map
-          cp .config ${{targets.subpkgdir}}/usr/lib/${kernel_version}/config
-          mkdir -p ${{targets.subpkgdir}}/usr/lib
+          mkdir -p ${{targets.subpkgdir}}/usr/lib/${{package.version}}
+          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${{package.version}}/vmlinuz
+          cp System.map ${{targets.subpkgdir}}/usr/lib/${{package.version}}/System.map
+          cp .config ${{targets.subpkgdir}}/usr/lib/${{package.version}}/config
 
   - name: kernel-modules
-    description: Kernel modules
+    description: Kernel modules for Linux
     dependencies:
       runtime:
         - kernel-core
     pipeline:
-      - runs: |
-          make -j$(nproc) modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
+      - uses: autoconf/make-install
+        with:
+          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
 
   - name: kernel-headers
     description: Kernel headers
@@ -69,4 +76,6 @@ subpackages:
       runtime:
         - kernel-core
     pipeline:
-      - runs: make -j$(nproc) headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}
+      - uses: autoconf/make-install
+        with:
+          opts: headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}
