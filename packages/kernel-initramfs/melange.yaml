@@ -25,6 +25,7 @@ environment:
     packages:
       - busybox
       - build-base
+      - bash
       - binutils-dev
       - wolfi-baselayout
       - kernel-core
@@ -33,9 +34,19 @@ environment:
       - kmod
       - zstd
       - posix-libc-utils
+      # For modules
+      - lvm2
+      - cryptsetup
+      - btrfs-progs
+      - systemd
+      - util-linux
+      - device-mapper
+      - openssl
 
 pipeline:
   - runs: |
-      mkdir -p /var/tmp
+      mkdir -p /var/tmp ${{targets.destdir}}/usr/lib/modules/${{package.version}}
       depmod ${{package.version}}
-      dracut --force --no-hostonly --reproducible --zstd --verbose --kver ${{package.version}} /usr/lib/modules/${{package.version}}/initramfs.img
+      dracut --force --no-hostonly --reproducible --zstd --verbose \
+        --kver ${{package.version}} --omit busybox \
+        ${{targets.destdir}}/usr/lib/modules/${{package.version}}/initramfs.img

@@ -5,25 +5,25 @@ generate-signing-key:
         cgr.dev/chainguard/melange \
         keygen
 
-# build $package="":
-#     #!/usr/bin/env bash
-#     mkdir -p ./output/packages
-#     podman run \
-#         --rm -it -v "${PWD}:/work:Z" --privileged \
-#         cgr.dev/chainguard/melange \
-#         --pipeline-dir /work/pipelines \
-#         --workspace-dir /work \
-#         build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
-
 build $package="":
-     #!/usr/bin/env bash
-     mkdir -p ./output/packages
-     QEMU_KERNEL_IMAGE=./tmp/kernel-core/usr/lib/6.15.6/vmlinuz melange \
-         --pipeline-dir ./pipelines \
-         --workspace-dir . \
-         --runner qemu \
-         --log-level debug \
-         build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
+    #!/usr/bin/env bash
+    mkdir -p ./output/packages
+    podman run \
+        --rm -it -v "${PWD}:/work:Z" --privileged \
+        cgr.dev/chainguard/melange \
+        --pipeline-dir /work/pipelines \
+        --workspace-dir /work \
+        build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
+
+# build $package="":
+#      #!/usr/bin/env bash
+#      mkdir -p ./output/packages
+#      QEMU_KERNEL_IMAGE=./tmp/kernel-core/usr/lib/6.15.6/vmlinuz melange \
+#          --pipeline-dir ./pipelines \
+#          --workspace-dir . \
+#          --runner qemu \
+#          --log-level debug \
+#          build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
 
 apko-build $yaml="apko.yaml" $tag="bootc-os:local" $tar="bootc-os.tar":
     #!/usr/bin/env bash

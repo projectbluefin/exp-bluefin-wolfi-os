@@ -21,7 +21,6 @@ environment:
     repositories:
       - https://packages.wolfi.dev/os
     packages:
-      # - busybox
       - build-base
       - wolfi-baselayout
       - autoconf
