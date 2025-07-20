@@ -1,0 +1,72 @@
+package:
+  name: kernel
+  version: 6.15.6
+  epoch: 1
+  description: The Linux kernel
+  copyright:
+    - license: GPL-2.0
+
+environment:
+  contents:
+    packages:
+      - bison
+      - flex
+      - busybox
+      - build-base
+      - binutils-dev
+      - wolfi-baselayout
+      - llvm
+      - libelf
+      - elfutils
+      - elfutils-dev
+      - openssl-dev
+      - findutils
+      - diffutils
+      - perl
+      - kmod
+      - rsync
+      - gawk
+      - gnutar
+      - openssl
+
+pipeline:
+  - uses: fetch
+    with:
+      uri: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{package.version}}.tar.xz
+      expected-sha256: 2bb586c954277d070c8fdf6d7275faa93b4807d9bf3353b491d8149cca02b4fc
+
+  - runs: |
+      make prepare
+      make modules_prepare
+
+  - runs: |
+      make -j$(nproc)
+
+subpackages:
+  - name: kernel-core
+    description: The Linux kernel
+    pipeline:
+      - runs: |
+          kernel_version=$(make kernelversion)
+          mkdir -p ${{targets.subpkgdir}}/usr/lib/${kernel_version}
+          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${kernel_version}/vmlinuz
+          cp System.map ${{targets.subpkgdir}}/usr/lib/${kernel_version}/System.map
+          cp .config ${{targets.subpkgdir}}/usr/lib/${kernel_version}/config
+          mkdir -p ${{targets.subpkgdir}}/usr/lib
+
+  - name: kernel-modules
+    description: Kernel modules
+    dependencies:
+      runtime:
+        - kernel-core
+    pipeline:
+      - runs: |
+          make -j$(nproc) modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
+
+  - name: kernel-headers
+    description: Kernel headers
+    dependencies:
+      runtime:
+        - kernel-core
+    pipeline:
+      - runs: make -j$(nproc) headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}

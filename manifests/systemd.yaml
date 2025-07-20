@@ -37,12 +37,6 @@ data:
 
 environment:
   contents:
-    repositories:
-      - https://packages.wolfi.dev/os
-      - /work/output/packages
-    keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-      - /work/melange.rsa.pub
     packages:
       - acl-dev
       - audit-dev
