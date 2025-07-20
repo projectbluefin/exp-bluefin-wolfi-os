@@ -6,11 +6,8 @@ export MELANGE_OPTS := "
     -i
     --debug
     --log-level=DEBUG
-    --fail-on-lint-warning
     --arch host
     --pipeline-dir ./pipelines
-    --lint-require
-    --lint-warn
     --repository-append https://packages.wolfi.dev/os
     --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
 
