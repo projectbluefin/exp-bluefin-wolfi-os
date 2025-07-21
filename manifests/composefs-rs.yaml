@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
+package:
+  name: composefs-rs
+  version: 1.5.1
+  epoch: 0
+  description: Boot and upgrade via container images
+  copyright:
+    - license: Apache-2.0-only
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - build-base
+      - cargo-auditable
+      - rust
+      - zstd-dev
+      - openssl-dev
+      - glib-dev
+      - ostree-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/containers/composefs-rs.git
+      branch: main
+      expected-commit: 28d4721f77f973f0e394d60d6a69d9b39cb38d7f
+
+  - runs: |
+      cargo auditable build --release
+
+subpackages:
+  - name: cfsctl
+    pipeline:
+      - runs: |
+          install -Dm755 -t ${{targets.subpkgdir}}/usr/bin target/release/cfsctl
+
+  - name: composefs-setup-root
+    pipeline:
+      - runs: |
+          install -Dm755 -t ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/ target/release/composefs-setup-root
+          cp ./composefs-setup-root.service ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/composefs-setup-root.service
+          cp ./module-setup.sh ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/module-setup.sh

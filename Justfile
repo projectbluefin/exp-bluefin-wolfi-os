@@ -1,6 +1,6 @@
 export MELANGE_IMAGE := env("MELANGE_IMAGE", "cgr.dev/chainguard/melange:latest")
 export SIGNING_KEY_PATH := env("SIGNING_KEY_PATH", "melange.rsa")
-export MELANGE_RUNNER := env("MELANGE_RUNNER", "docker")
+export MELANGE_RUNNER := env("MELANGE_RUNNER", "bubblewrap")
 export PACKAGES_DIR := env("PACKAGES_DIR", "manifests")
 export MELANGE_OPTS := "
     -i
@@ -11,13 +11,27 @@ export MELANGE_OPTS := "
     --repository-append https://packages.wolfi.dev/os
     --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
 
+create-cache-dir:
+    mkdir -p ./.cache/apk-cache
+    mkdir -p ./.cache/melange
+    mkdir -p ./.cache/workspace
+
 keygen *$ARGS:
     podman run --rm -it -v "${PWD}:/work:Z" -w /work \
         "${MELANGE_IMAGE}" \
         keygen $ARGS
 
 build $package="":
-    melange build $MELANGE_OPTS "${PACKAGES_DIR}/${package}.yaml" --repository-append "./packages" --source-dir "${PACKAGES_DIR}/${package}" --keyring-append "${SIGNING_KEY_PATH}.pub" --signing-key "${SIGNING_KEY_PATH}" --runner "${MELANGE_RUNNER}"
+    just create-cache-dir
+    melange build $MELANGE_OPTS "${PACKAGES_DIR}/${package}.yaml" \
+        --repository-append "./packages" \
+        --apk-cache-dir "./.cache/apk-cache" \
+        --cache-dir "./.cache/melange" \
+        --workspace-dir "./.cache/workspace" \
+        --source-dir "./${PACKAGES_DIR}/${package}" \
+        --keyring-append "./${SIGNING_KEY_PATH}.pub" \
+        --signing-key "./${SIGNING_KEY_PATH}" \
+        --runner "${MELANGE_RUNNER}"
 
 build-tree:
     echo "This will build all packages required for Wolfi Bootc"
@@ -25,9 +39,14 @@ build-tree:
     just build ostree
     just build bootc
 
+    just build composefs-rs
     just build dracut
-    just build kernel
 
+    just build systemd
+    just build kernel
+    just build kernel-initramfs
+    just build py3-pefile
+    just build kernel-uki
 
 renovate:
     #!/usr/bin/env bash

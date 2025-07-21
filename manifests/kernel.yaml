@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: kernel
   version: 6.15.6
@@ -25,6 +27,7 @@ environment:
       - elfutils-dev
       - openssl-dev
       - findutils
+      - coreutils
       - diffutils
       - perl
       - kmod
@@ -32,6 +35,7 @@ environment:
       - gawk
       - gnutar
       - openssl
+      - xz
 
 pipeline:
   - uses: git-checkout
@@ -55,10 +59,10 @@ subpackages:
     description: The Linux kernel core
     pipeline:
       - runs: |
-          mkdir -p ${{targets.subpkgdir}}/usr/lib/${{package.version}}
-          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${{package.version}}/vmlinuz
-          cp System.map ${{targets.subpkgdir}}/usr/lib/${{package.version}}/System.map
-          cp .config ${{targets.subpkgdir}}/usr/lib/${{package.version}}/config
+          mkdir -p ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}
+          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/vmlinuz
+          cp System.map ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/System.map
+          cp .config ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/config
 
   - name: kernel-modules
     description: Kernel modules for Linux
@@ -68,7 +72,7 @@ subpackages:
     pipeline:
       - uses: autoconf/make-install
         with:
-          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
+          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr INSTALL_MOD_COMPRESS=xz
 
   - name: kernel-headers
     description: Kernel headers

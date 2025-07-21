@@ -1,6 +1,6 @@
 x86_64/
 tmp/
-output/
+packages/
 .vscode/
-melange-cache/
+.cache/
 melange.rsa*

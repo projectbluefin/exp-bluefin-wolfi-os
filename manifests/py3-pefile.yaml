@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: py3-pefile
   version: "2024.8.26"
@@ -10,10 +12,6 @@ package:
 
 environment:
   contents:
-    repositories:
-      - https://packages.wolfi.dev/os
-    keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - build-base
       - busybox

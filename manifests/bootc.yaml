@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: bootc
   version: 1.5.1
@@ -9,17 +11,26 @@ package:
 environment:
   contents:
     packages:
+      - busybox
+      - build-base
+      - cargo-auditable
+      - rust
+      - zstd-dev
+      - openssl-dev
+      - glib-dev
       - ostree-dev
 
 pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/bootc-dev/bootc.git
-      tag: v${{package.version}}
-      expected-commit: 3a0c6abd9bc79f07302b27bf66f63c3943e7a6c8
+      branch: composefs-backend
+      # tag: v${{ package.version }}
+      expected-commit: 04f048f855fe64352af8bdf9c7eab87b123e3a9a
 
-  - uses: cargo/build
-    with:
-      output: bootc
+  - runs: |
+      cargo auditable build --release --locked
+      install -Dm755 -t ${{targets.destdir}}/usr/bin target/release/bootc
+      install -Dm755 -t ${{targets.destdir}}/usr/bin target/release/system-reinstall-bootc
 
   - uses: strip

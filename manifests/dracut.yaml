@@ -1,10 +1,18 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: dracut
-  version: 106
+  version: 107
   epoch: 0
   description: Initramfs generator using udev
   copyright:
     - license: GPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only
+  dependencies:
+    runtime:
+      - udev
+      - coreutils
+      - cpio
+      - findmnt
 
 environment:
   contents:
@@ -26,7 +34,7 @@ pipeline:
     with:
       repository: https://github.com/dracut-ng/dracut-ng.git
       tag: ${{package.version}}
-      expected-commit: 956c08774074ddc45b2f975e13d5c13d1fc36eff
+      expected-commit: 279da16f1b8fcca27d41937967c4e8f4c295086a
 
   - runs: |
       mkdir -p ${{targets.destdir}}/usr/lib/systemd/system

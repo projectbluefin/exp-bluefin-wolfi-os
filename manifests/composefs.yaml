@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: composefs
   version: 1.0.8
@@ -22,7 +24,7 @@ pipeline:
       repository: https://github.com/containers/composefs.git
       tag: v${{ package.version }}
       expected-commit: 858ce1b38e1534c2602eb431124b5dca706bc746
-      
+
   - uses: meson/configure
     with:
       opts: |
@@ -42,4 +44,3 @@ subpackages:
     test:
       pipeline:
         - uses: test/ldd-check
-

@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: kernel-uki
   version: 6.15.6
@@ -17,6 +19,7 @@ environment:
       - wolfi-baselayout
       - kernel-core
       - kernel-modules
+      - kernel-initramfs
       - systemd-ukify
       - systemd-uki-tools
       - python3
@@ -28,11 +31,6 @@ environment:
 
 pipeline:
   - runs: |
-      mkdir -p /var/tmp
-      depmod ${{package.version}}
-      dracut --force --no-hostonly --reproducible --zstd --verbose --kver ${{package.version}} /usr/lib/modules/${{package.version}}/initramfs.img
-
-  - runs: |
       ukify build \
-        --linux=/usr/lib/${{package.version}}/vmlinuz \
+        --linux=/usr/lib/modules/${{package.version}}/vmlinuz \
         --initrd=/usr/lib/modules/${{package.version}}/initramfs.img
