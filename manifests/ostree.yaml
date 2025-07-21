@@ -66,11 +66,3 @@ subpackages:
     test:
       pipeline:
         - uses: test/ldd-check
-
-  - name: ostree-prepare-root
-    description: Prepare a rootfs for ostree
-    pipeline:
-      - runs: |
-          install -Dm755 -t ${{targets.destdir}}/usr/bin \
-            contrib/prepare-root/ostree-prepare-root
-      - uses: strip
