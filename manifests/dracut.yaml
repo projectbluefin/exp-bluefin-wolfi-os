@@ -1,10 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: dracut
   version: 107
   epoch: 0
   description: Initramfs generator using udev
-  target-architecture:
-    - x86_64
   copyright:
     - license: GPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only
   dependencies:
@@ -16,11 +16,8 @@ package:
 
 environment:
   contents:
-    keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-    repositories:
-      - https://packages.wolfi.dev/os
     packages:
+      - busybox
       - build-base
       - wolfi-baselayout
       - autoconf

@@ -1,40 +1,56 @@
-generate-signing-key:
-    #!/usr/bin/env bash
-    podman run \
-        --rm -it -v "${PWD}:/work:Z" --privileged \
-        cgr.dev/chainguard/melange \
-        keygen
+export MELANGE_IMAGE := env("MELANGE_IMAGE", "cgr.dev/chainguard/melange:latest")
+export SIGNING_KEY_PATH := env("SIGNING_KEY_PATH", "melange.rsa")
+export MELANGE_RUNNER := env("MELANGE_RUNNER", "bubblewrap")
+export PACKAGES_DIR := env("PACKAGES_DIR", "manifests")
+export MELANGE_OPTS := "
+    -i
+    --debug
+    --log-level=DEBUG
+    --arch host
+    --pipeline-dir ./pipelines
+    --repository-append https://packages.wolfi.dev/os
+    --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
+
+create-cache-dir:
+    mkdir -p ./.cache/apk-cache
+    mkdir -p ./.cache/melange
+    mkdir -p ./.cache/workspace
+
+keygen *$ARGS:
+    podman run --rm -it -v "${PWD}:/work:Z" -w /work \
+        "${MELANGE_IMAGE}" \
+        keygen $ARGS
 
 build $package="":
-    #!/usr/bin/env bash
-    mkdir -p ./output/packages
-    podman run \
-        --rm -it -v "${PWD}:/work:Z" --privileged \
-        cgr.dev/chainguard/melange \
-        --pipeline-dir /work/pipelines \
-        --workspace-dir /work \
-        build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
+    just create-cache-dir
+    melange build $MELANGE_OPTS "${PACKAGES_DIR}/${package}.yaml" \
+        --repository-append "./packages" \
+        --apk-cache-dir "./.cache/apk-cache" \
+        --cache-dir "./.cache/melange" \
+        --workspace-dir "./.cache/workspace" \
+        --source-dir "./${PACKAGES_DIR}/${package}" \
+        --keyring-append "./${SIGNING_KEY_PATH}.pub" \
+        --signing-key "./${SIGNING_KEY_PATH}" \
+        --runner "${MELANGE_RUNNER}"
 
-# build $package="":
-#      #!/usr/bin/env bash
-#      mkdir -p ./output/packages
-#      QEMU_KERNEL_IMAGE=./tmp/kernel-core/usr/lib/6.15.6/vmlinuz melange \
-#          --pipeline-dir ./pipelines \
-#          --workspace-dir . \
-#          --runner qemu \
-#          --log-level debug \
-#          build "packages/${package}/melange.yaml" --arch host --signing-key melange.rsa --out-dir ./output/packages/
+build-tree:
+    echo "This will build all packages required for Wolfi Bootc"
+    just build composefs
+    just build ostree
+    just build bootc
 
-apko-build $yaml="apko.yaml" $tag="bootc-os:local" $tar="bootc-os.tar":
+    just build composefs-rs
+    just build dracut
+
+    just build systemd
+    just build kernel
+    just build kernel-initramfs
+    just build py3-pefile
+    just build kernel-uki
+
+renovate:
     #!/usr/bin/env bash
-    mkdir -p ./output/oci
-    podman run \
-        --rm -it -v "${PWD}:/work:Z" --privileged \
-        cgr.dev/chainguard/apko \
-        --workdir /work \
-        --sbom-path ./output/oci \
-        build "${yaml}" "${tag}" ./output/oci/"${tar}"
-    podman load < ./output/oci/"${tar}"
+    GITHUB_COM_TOKEN=$(cat ~/.ssh/gh_renovate) LOG_LEVEL=${LOG_LEVEL:-debug} renovate --platform=local
 
 build-image:
     sudo podman build \

@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: systemd
   # 35712.patch can be dropped when 258 releases
@@ -37,12 +39,6 @@ data:
 
 environment:
   contents:
-    repositories:
-      - https://packages.wolfi.dev/os
-      - /work/output/packages
-    keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-      - /work/melange.rsa.pub
     packages:
       - acl-dev
       - audit-dev

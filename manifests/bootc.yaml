@@ -1,21 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: bootc
-  version: 1.4.0
+  version: 1.5.1
   epoch: 0
   description: Boot and upgrade via container images
-  target-architecture:
-    - x86_64
   copyright:
     - license: Apache-2.0-only
 
 environment:
   contents:
-    keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-      - /work/melange.rsa.pub
-    repositories:
-      - https://packages.wolfi.dev/os
-      - /work/output/packages
     packages:
       - busybox
       - build-base
@@ -30,8 +24,9 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/bootc-dev/bootc.git
-      tag: v${{ package.version }}
-      expected-commit: 58ee28cbab24cccb53cf7c2d975fe7eb5773b137
+      branch: composefs-backend
+      # tag: v${{ package.version }}
+      expected-commit: 04f048f855fe64352af8bdf9c7eab87b123e3a9a
 
   - runs: |
       cargo auditable build --release --locked
