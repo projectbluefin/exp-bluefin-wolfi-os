@@ -11,6 +11,12 @@ export MELANGE_OPTS := "
     --repository-append https://packages.wolfi.dev/os
     --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
 
+generate-signing-key:
+    podman run \
+        --rm -it -v "${PWD}:/work:Z" --privileged \
+        cgr.dev/chainguard/melange \
+        keygen
+
 create-cache-dir:
     mkdir -p ./.cache/apk-cache
     mkdir -p ./.cache/melange
