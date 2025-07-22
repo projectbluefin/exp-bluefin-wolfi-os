@@ -1,7 +1,7 @@
 contents:
   packages:
+    - apk-tools
     - ca-certificates-bundle
-    - wolfi-base
     - kernel-uki
     - systemd
     - bootc
