@@ -14,38 +14,23 @@ environment:
       - busybox
       - build-base
       - wolfi-baselayout
+      - cargo-auditable
       - autoconf
       - automake
       - rust
       - systemd
-      - zstd
       - openssl-dev
 
 pipeline:
-  - uses: fetch
+  - uses: git-checkout
     with:
-      uri: https://github.com/coreos/bootupd/releases/download/v0.2.27/bootupd-0.2.27.tar.zstd
-      expected-sha256: 3253fa6621a68a0aa09c807fb619dc6aeb10f8d4cb5baedec8a51a3de635166f
-      extract: "false"
+      repository: https://github.com/coreos/bootupd
+      tag: v${{package.version}}
+      expected-commit: 3203db5800e4e261bb1d04bf58c578eadf13da73
 
   - runs: |
-      zstd -d bootupd-${{package.version}}.tar.zstd -o bootupd-${{package.version}}.tar
-      tar -xvf bootupd-${{package.version}}.tar -C ${{package.srcdir}}
-
-  - runs: cargo install cargo-license
-    working-directory: ${{package.srcdir}}/bootupd-${{package.version}}
-
-  - runs: cargo vendor
-    working-directory: ${{package.srcdir}}/bootupd-${{package.version}}
-
-  - runs: |
-      cargo build --release
-      cargo vendor > .cargo/config
-      cargo license --json > license-summary.json
-      cargo license > LICENSE.dependencies
-    working-directory: ${{package.srcdir}}/bootupd-${{package.version}}
+      cargo auditable build --release --locked
 
   - runs: |
       make install INSTALL="install -p -c" DESTDIR=${{targets.destdir}}
       make install-grub-static DESTDIR=${{targets.destdir}}
-    working-directory: ${{package.srcdir}}/bootupd-${{package.version}}
