@@ -4,3 +4,4 @@ packages/
 .vscode/
 .cache/
 melange.rsa*
+output/
