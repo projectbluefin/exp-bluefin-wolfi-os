@@ -1,8 +1,6 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: ostree
-  version: 2025.2
+  version: "2025.2"
   epoch: 0
   description: "Operating system and container binary deployment and upgrades"
   copyright:
@@ -11,25 +9,19 @@ package:
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
       - bison
-      - autoconf
-      - pkgconf-dev
-      - automake
-      - libtool
-      - xz-dev
+      - build-base
+      - composefs-dev
+      - curl-dev
       - e2fsprogs-dev
       - fuse3-dev
-      - zlib-dev
-      - openssl-dev
       - glib-dev
       - gpgme-dev
       - libarchive-dev
-      - systemd-dev
       - libselinux-dev
-      - curl-dev
-      - composefs-dev
+      - libtool
+      - pkgconf-dev
+      - systemd-dev
 
 pipeline:
   - uses: git-checkout
@@ -65,4 +57,42 @@ subpackages:
       - uses: split/dev
     test:
       pipeline:
-        - uses: test/ldd-check
+        - uses: test/tw/ldd-check
+
+test:
+  pipeline:
+    - runs: |
+        set -o pipefail
+        ostree --help | grep -F -e "Commands for managing a host system booted with ostree"
+        ostree --version | grep -F -e "${{package.version}}"
+    - name: Ensure expected modules are installed
+      runs: |
+        set -o pipefail
+        MODULES_OUTPUT=$(mktemp)
+        ostree --version 2>&1 | tee "${MODULES_OUTPUT}"
+        grep_file() {
+          grep -F -e $@ "${MODULES_OUTPUT}"
+        }
+        grep_file "inode64"
+        grep_file "initial-var"
+        grep_file "libcurl"
+        # TODO: enable this one libsoup is packaged
+        # grep_file "libsoup3"
+        grep_file "gpgme"
+        grep_file "composefs"
+        grep_file "ex-fsverity"
+        grep_file "libarchive"
+        grep_file "selinux"
+        grep_file "openssl"
+        grep_file "sign-ed25519"
+        grep_file "sign-spki"
+        grep_file "libmount"
+        grep_file "systemd"
+        grep_file "release"
+        grep_file "p2p"
+
+update:
+  enabled: true
+  github:
+    identifier: ostreedev/ostree
+    strip-prefix: v

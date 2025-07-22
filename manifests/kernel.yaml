@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: kernel
   version: 6.15.6
@@ -7,38 +5,32 @@ package:
   description: The Linux kernel
   copyright:
     - license: GPL-2.0
-  dependencies:
-    runtime:
-      - kernel-core
-      - kernel-modules
 
 environment:
   contents:
     packages:
-      - bison
-      - flex
-      - busybox
-      - build-base
       - binutils-dev
-      - wolfi-baselayout
-      - llvm
-      - libelf
+      - bison
+      - build-base
+      - busybox
+      - diffutils
       - elfutils
       - elfutils-dev
-      - openssl-dev
       - findutils
-      - coreutils
-      - diffutils
-      - perl
-      - kmod
-      - rsync
+      - flex
       - gawk
       - gnutar
+      - kmod
+      - libelf
+      - llvm
       - openssl
-      - xz
+      - openssl-dev
+      - perl
+      - rsync
+      - wolfi-baselayout
 
 pipeline:
-  - uses: git-checkout
+  - uses: fetch
     with:
       repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
       tag: v${{package.version}}
@@ -52,27 +44,31 @@ pipeline:
     with:
       opts: modules_prepare
 
-  - uses: autoconf/make
+  - environment:
+      TMPDIR: /home/build/tmp
+    uses: autoconf/make
 
 subpackages:
   - name: kernel-core
-    description: The Linux kernel core
+    description: The Linux kernel
     pipeline:
       - runs: |
-          mkdir -p ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}
-          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/vmlinuz
-          cp System.map ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/System.map
-          cp .config ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/config
+          kernel_version=$(make kernelversion)
+          mkdir -p ${{targets.subpkgdir}}/usr/lib/${kernel_version}
+          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${kernel_version}/vmlinuz
+          cp System.map ${{targets.subpkgdir}}/usr/lib/${kernel_version}/System.map
+          cp .config ${{targets.subpkgdir}}/usr/lib/${kernel_version}/config
+          mkdir -p ${{targets.subpkgdir}}/usr/lib
 
   - name: kernel-modules
-    description: Kernel modules for Linux
+    description: Kernel modules
     dependencies:
       runtime:
         - kernel-core
     pipeline:
-      - uses: autoconf/make-install
+      - uses: autoconf/make
         with:
-          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr INSTALL_MOD_COMPRESS=xz
+          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
 
   - name: kernel-headers
     description: Kernel headers
@@ -80,6 +76,14 @@ subpackages:
       runtime:
         - kernel-core
     pipeline:
-      - uses: autoconf/make-install
+      - uses: autoconf/make
         with:
           opts: headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}
+
+update:
+  enabled: true
+  ignore-regex-patterns:
+    - ".*-rc.*"
+  release-monitor:
+    identifier: 358810
+

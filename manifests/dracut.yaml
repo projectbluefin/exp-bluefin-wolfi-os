@@ -1,32 +1,20 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: dracut
-  version: 107
+  version: "107"
   epoch: 0
   description: Initramfs generator using udev
   copyright:
     - license: GPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only
-  dependencies:
-    runtime:
-      - udev
-      - coreutils
-      - cpio
-      - findmnt
 
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
-      - wolfi-baselayout
-      - autoconf
-      - automake
       - bash
-      - kmod-dev
-      - pkgconf
-      - rust
+      - build-base
       - coreutils
+      - kmod-dev
+      - pkgconf-dev
+      - rust
       - systemd-dev
 
 pipeline:
@@ -35,11 +23,6 @@ pipeline:
       repository: https://github.com/dracut-ng/dracut-ng.git
       tag: ${{package.version}}
       expected-commit: 279da16f1b8fcca27d41937967c4e8f4c295086a
-
-  - runs: |
-      mkdir -p ${{targets.destdir}}/usr/lib/systemd/system
-      mkdir -p ${{targets.destdir}}/usr/share/bash-completion/completions
-      mkdir -p ${{targets.destdir}}/usr/lib
 
   - uses: autoconf/configure
     with:
@@ -62,6 +45,15 @@ subpackages:
     description: Headers and dev libraries from Dracut
     pipeline:
       - uses: split/dev
-    dependencies:
-      runtime:
-        - dracut
+    test:
+      pipeline:
+        - uses: test/tw/ldd-check
+
+test:
+  pipeline:
+    - runs: |
+        set -o pipefail
+        dracut --help | grep -F -e "Creates initial ramdisk images for preloading modules"
+        dracut --version | grep -F -e "${{package.version}}"
+        lsinitrd --help 2>&1 | grep -F -e "Usage: lsinitrd"
+        dracut-catimages --help 2>&1 | grep -F -e "Creates initial ramdisk image by concatenating several images from the command"

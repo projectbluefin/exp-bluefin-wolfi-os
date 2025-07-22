@@ -1,8 +1,6 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: composefs-rs
-  version: 1.5.1
+  version: 0_git20250721
   epoch: 0
   description: Boot and upgrade via container images
   copyright:
@@ -11,13 +9,6 @@ package:
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
-      - cargo-auditable
-      - rust
-      - zstd-dev
-      - openssl-dev
-      - glib-dev
       - ostree-dev
 
 pipeline:
@@ -27,18 +18,32 @@ pipeline:
       branch: main
       expected-commit: 28d4721f77f973f0e394d60d6a69d9b39cb38d7f
 
-  - runs: |
-      cargo auditable build --release
+  - uses: cargo/build
+    with:
+      output: composefs-setup-root
+
+  - uses: strip
 
 subpackages:
-  - name: cfsctl
+  - name: ${{package.name}}-dracut
+    description: Dracut modules for composefs-rs
     pipeline:
-      - runs: |
-          install -Dm755 -t ${{targets.subpkgdir}}/usr/bin target/release/cfsctl
+    - runs: |
+        install -Dpm0755 -t "${{targets.destdir}}/usr/lib/dracut/modules.d/37composefs/" target/release/composefs-setup-root ./module-setup.sh
+        install -Dpm0644 -t "${{targets.destdir}}/usr/lib/dracut/modules.d/37composefs/" ./composefs-setup-root.service 
 
-  - name: composefs-setup-root
-    pipeline:
-      - runs: |
-          install -Dm755 -t ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/ target/release/composefs-setup-root
-          cp ./composefs-setup-root.service ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/composefs-setup-root.service
-          cp ./module-setup.sh ${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/module-setup.sh
+test:
+  pipeline:
+    - runs: |
+        set -o pipefail
+        composefs-setup-root --help | grep -F -e "Usage: composefs-setup-root"
+        composefs-setup-root --version | grep -F -e "${{package.version}}"
+
+update:
+  enabled: false
+  exclude-reason: No releases or tags
+  schedule:
+    period: daily
+    reason: Upstream does not maintain tags or releases
+  github:
+    identifier: containers/composefs-rs

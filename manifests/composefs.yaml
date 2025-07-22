@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: composefs
   version: 1.0.8
@@ -11,10 +9,7 @@ package:
 environment:
   contents:
     packages:
-      - busybox
-      - usrmerge-tool
       - build-base
-      - meson
       - fuse3-dev
       - openssl-dev
 
@@ -22,25 +17,59 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/containers/composefs.git
-      tag: v${{ package.version }}
+      tag: v${{package.version}}
       expected-commit: 858ce1b38e1534c2602eb431124b5dca706bc746
 
   - uses: meson/configure
     with:
       opts: |
         --default-library=shared \
-        -Dfuse=enabled \
-        --prefix=$dest/usr
+        -Dfuse=enabled
+
   - uses: meson/compile
+
   - uses: meson/install
-  - runs: usrmerge-tool -usr-sbin ${{targets.destdir}}
+
+  - runs: |
+      mkdir -p "${{targets.destdir}}/usr/bin"
+      mv "${{targets.destdir}}"/usr/sbin/* "${{targets.destdir}}/usr/bin"
+      rm -r "${{targets.destdir}}/usr/sbin"
+
   - uses: strip
 
 subpackages:
-  - name: composefs-dev
-    description: Headers and dev libraries from composefs
+  - name: ${{package.name}}-dev
+    description: Headers and dev libraries from ${{package.name}}
     pipeline:
       - uses: split/dev
     test:
       pipeline:
-        - uses: test/ldd-check
+        - uses: test/tw/ldd-check
+
+  - name: ${{package.name}}-static
+    description: Static libraries for ${{package.name}}
+    pipeline:
+      - uses: split/static
+    test:
+      pipeline:
+        - uses: test/tw/ldd-check
+
+test:
+  pipeline:
+    - runs: |
+        set -o pipefail
+        {
+          mkcomposefs --help 2>&1 || true
+        } | grep -F -e "Usage: mkcomposefs"
+        {
+          mount.composefs 2>&1 || true
+        } | grep -F -e "mount.composefs -o basedir"
+        {
+          composefs-info 2>&1 || true
+        } | grep -F -e "usage: composefs-info"
+
+update:
+  enabled: true
+  github:
+    identifier: containers/composefs
+    strip-prefix: v

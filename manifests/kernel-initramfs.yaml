@@ -5,8 +5,6 @@ package:
   version: 6.15.6
   epoch: 1
   description: The Linux kernel initramfs
-  target-architecture:
-    - x86_64
   copyright:
     - license: GPL-2.0
   dependencies:
