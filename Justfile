@@ -10,6 +10,9 @@ export MELANGE_OPTS := "
     --pipeline-dir ./pipelines
     --repository-append https://packages.wolfi.dev/os
     --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
+export APKO_OPTS := "
+    --repository-append https://packages.wolfi.dev/os
+    --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
 
 generate-signing-key:
     podman run \
@@ -30,13 +33,13 @@ keygen *$ARGS:
 build $package="":
     just create-cache-dir
     melange build $MELANGE_OPTS "${PACKAGES_DIR}/${package}.yaml" \
+        --source-dir "./${PACKAGES_DIR}/${package}" \
         --repository-append "./packages" \
+        --keyring-append "./${SIGNING_KEY_PATH}.pub" \
+        --signing-key "./${SIGNING_KEY_PATH}" \
         --apk-cache-dir "./.cache/apk-cache" \
         --cache-dir "./.cache/melange" \
         --workspace-dir "./.cache/workspace" \
-        --source-dir "./${PACKAGES_DIR}/${package}" \
-        --keyring-append "./${SIGNING_KEY_PATH}.pub" \
-        --signing-key "./${SIGNING_KEY_PATH}" \
         --runner "${MELANGE_RUNNER}"
 
 build-tree:
@@ -58,9 +61,18 @@ renovate:
     #!/usr/bin/env bash
     GITHUB_COM_TOKEN=$(cat ~/.ssh/gh_renovate) LOG_LEVEL=${LOG_LEVEL:-debug} renovate --platform=local
 
-build-image:
+build-containerfile:
     sudo podman build \
         -t wolfi-bootc:latest .
+
+build-apko $yaml="apko.yaml" $tag="wolfi-bootc:latest" $tar="wolfi-bootc.tar":
+    mkdir -p ./output/oci
+    apko build $APKO_OPTS \
+        --repository-append "./packages" \
+        --keyring-append "./${SIGNING_KEY_PATH}.pub" \
+        --sbom-path ./output/oci \
+        "${yaml}" "${tag}" ./output/oci/"${tar}"
+    sudo podman load < ./output/oci/"${tar}"
 
 bootc *ARGS:
     sudo podman run \

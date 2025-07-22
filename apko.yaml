@@ -1,23 +1,17 @@
 contents:
-  repositories:
-    - https://packages.wolfi.dev/os
-    - /work/output/packages
-  keyring:
-    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-    - /work/melange.rsa.pub
   packages:
     - ca-certificates-bundle
     - wolfi-base
     - kernel-uki
     - systemd
     - bootc
-    - bootupd
-    - ostree
-    - podman
+    # - podman # https://github.com/wolfi-dev/os/issues/60292
+    - skopeo
     - bash
     - coreutils
     - merged-bin
     - file
+    - btrfs-progs
 
 archs:
   - x86_64
