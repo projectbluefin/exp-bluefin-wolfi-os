@@ -25,8 +25,8 @@ environment:
       - kernel-initramfs
       - systemd-ukify
       - systemd-uki-tools
+      - systemd-measure
       - python3
-      - py3-pefile
       - dracut
       - kmod
       - zstd
@@ -36,6 +36,7 @@ pipeline:
   - runs: |
       mkdir -p ${{targets.destdir}}/usr/lib/efi
       ukify build \
+        --measure \
         --linux=/usr/lib/modules/${{package.version}}/vmlinuz \
         --initrd=/usr/lib/modules/${{package.version}}/initramfs.img \
         --output=${{targets.destdir}}/usr/lib/efi/EFI
