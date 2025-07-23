@@ -246,6 +246,19 @@ subpackages:
           mkdir -p ${{targets.subpkgdir}}/usr/lib/systemd/boot/efi
           cp ${{targets.destdir}}/usr/lib/systemd/boot/efi/linuxx64.efi.stub ${{targets.subpkgdir}}/usr/lib/systemd/boot/efi/linuxx64.efi.stub
 
+  - name: systemd-measure
+    description: "Pre-calculate and sign expected TPM2 PCR 11 values for booted unified kernel images"
+    dependencies:
+      runtime:
+        - merged-lib
+        - merged-sbin
+        - merged-usrsbin
+        - wolfi-baselayout
+    pipeline:
+      - runs: |
+          mkdir -p ${{targets.subpkgdir}}/usr/lib/systemd
+          mv ${{targets.destdir}}/usr/lib/systemd/systemd-measure ${{targets.subpkgdir}}/usr/lib/systemd/systemd-measure
+
   - name: systemd-shutdown-standalone
     description: Standalone version of ${{range.key}}
     # Can't test this with --version because the binary checks the pid before anything else

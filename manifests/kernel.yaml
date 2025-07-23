@@ -24,13 +24,11 @@ environment:
       - libelf
       - llvm
       - openssl
-      - openssl-dev
-      - perl
-      - rsync
-      - wolfi-baselayout
+      - xz
+      - zstd
 
 pipeline:
-  - uses: fetch
+  - uses: git
     with:
       repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
       tag: v${{package.version}}
@@ -69,6 +67,16 @@ subpackages:
       - uses: autoconf/make
         with:
           opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
+
+      - runs: |
+          echo "Compressing kernel modules with xz..."
+          find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' -print0 | xargs -0 -n1 -P$(nproc) xz -T1 --check=crc32 --lzma2=dict=1MiB
+
+          echo "Verifying all modules are compressed..."
+          if find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' | grep -q .; then
+            echo "ERROR: Uncompressed .ko files remain!" >&2
+            exit 1
+          fi
 
   - name: kernel-headers
     description: Kernel headers
