@@ -34,22 +34,6 @@ pipeline:
       tag: v${{package.version}}
       expected-commit: 1562d948232546cfad45a1beddc70fe0c7b34950
 
-  - if: ${{build.arch}} == 'x86_64'
-    uses: fetch
-    with:
-      uri: https://gitlab.com/CentOS/Hyperscale/rpms/kernel/-/raw/c10s-hsk/kernel-x86_64-fedora.config?ref_type=heads
-      expected-sha256: c6143d23b99929aaf8d3634d42ef83420e03453340a8a697f7f2c8f2e885891f
-      extract: false
-
-  - if: ${{build.arch}} == 'aarch64'
-    uses: fetch
-    with:
-      uri: https://gitlab.com/CentOS/Hyperscale/rpms/kernel/-/raw/c10s-hsk/kernel-aarch64-fedora.config?ref_type=heads
-      expected-sha256: 1b4a5e2cfab510f6dfdde603764eaaa1de993c50fb0deccf662b9847d3876c03
-      extract: false
-
-  - runs: mv kernel-${{build.arch}}-fedora.config* .config
-
   - uses: autoconf/make
     with:
       opts: prepare
@@ -58,7 +42,9 @@ pipeline:
     with:
       opts: modules_prepare
 
-  - uses: autoconf/make
+  - environment:
+      TMPDIR: /home/build/tmp
+    uses: autoconf/make
 
   - uses: autoconf/make
     environment:
