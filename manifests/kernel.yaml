@@ -17,7 +17,10 @@ environment:
       - elfutils
       - elfutils-dev
       - findutils
+      - openssl-dev
       - flex
+      - perl
+      - rsync
       - gawk
       - gnutar
       - kmod
@@ -34,6 +37,8 @@ pipeline:
       tag: v${{package.version}}
       expected-commit: 1562d948232546cfad45a1beddc70fe0c7b34950
 
+  - runs: mv config-${{build.arch}}* .config
+
   - uses: autoconf/make
     with:
       opts: prepare
@@ -42,9 +47,7 @@ pipeline:
     with:
       opts: modules_prepare
 
-  - environment:
-      TMPDIR: /home/build/tmp
-    uses: autoconf/make
+  - uses: autoconf/make
 
   - uses: autoconf/make
     environment:
