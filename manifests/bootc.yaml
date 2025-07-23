@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: bootc
   version: 1.5.1
@@ -11,13 +9,6 @@ package:
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
-      - cargo-auditable
-      - rust
-      - zstd-dev
-      - openssl-dev
-      - glib-dev
       - ostree-dev
 
 pipeline:
@@ -25,12 +16,28 @@ pipeline:
     with:
       repository: https://github.com/bootc-dev/bootc.git
       branch: composefs-backend
-      # tag: v${{ package.version }}
       expected-commit: 04f048f855fe64352af8bdf9c7eab87b123e3a9a
 
-  - runs: |
-      cargo auditable build --release --locked
-      install -Dm755 -t ${{targets.destdir}}/usr/bin target/release/bootc
-      install -Dm755 -t ${{targets.destdir}}/usr/bin target/release/system-reinstall-bootc
+  - uses: cargo/build
+    with:
+      output: bootc
 
   - uses: strip
+
+test:
+  environment:
+    contents:
+      packages:
+        - yq
+  pipeline:
+    - runs: |
+        set -o pipefail
+        bootc --version | grep -F -e "${{package.version}}"
+        bootc --help | grep -F -e "Deploy and transactionally in-place with bootable container images."
+        bootc status | yq .apiVersion | grep -F -e "org.containers.bootc/v1"
+
+update:
+  enabled: true
+  github:
+    identifier: bootc-dev/bootc
+    strip-prefix: v

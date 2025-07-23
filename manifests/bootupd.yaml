@@ -1,9 +1,7 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
-
 package:
   name: bootupd
-  version: 0.2.27
-  epoch: 1
+  version: 0.2.28
+  epoch: 2
   description: Bootloader updater
   copyright:
     - license: Apache-2.0
@@ -11,14 +9,6 @@ package:
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
-      - wolfi-baselayout
-      - cargo-auditable
-      - autoconf
-      - automake
-      - rust
-      - systemd
       - openssl-dev
 
 pipeline:
@@ -26,11 +16,31 @@ pipeline:
     with:
       repository: https://github.com/coreos/bootupd
       tag: v${{package.version}}
-      expected-commit: 3203db5800e4e261bb1d04bf58c578eadf13da73
+      expected-commit: 766bb80cbe22bcaba3f4c466385bf38d089f2917
 
-  - runs: |
-      cargo auditable build --release --locked
+  - uses: cargo/build
+    with:
+      output: bootupd
 
-  - runs: |
-      make install INSTALL="install -p -c" DESTDIR=${{targets.destdir}}
-      make install-grub-static DESTDIR=${{targets.destdir}}
+  - uses: autoconf/make-install
+
+  - uses: autoconf/make
+    with:
+      opts: install-grub-static DESTDIR="${{targets.destdir}}"
+
+  - uses: strip
+
+test:
+  pipeline:
+    - runs: |
+        set -o pipefail
+        bootupd --help | grep -F -e "Bootupd backend commands"
+        bootupd --version | grep -F -e "${{package.version}}"
+        bootupctl --help | grep -F -e "Bootupd client application"
+        bootupctl --version | grep -F -e "${{package.version}}"
+
+update:
+  enabled: true
+  github:
+    identifier: coreos/bootupd
+    strip-prefix: v
