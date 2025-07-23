@@ -7,10 +7,6 @@ package:
   description: The Linux kernel
   copyright:
     - license: GPL-2.0
-  dependencies:
-    runtime:
-      - kernel-core
-      - kernel-modules
 
 environment:
   contents:
@@ -36,6 +32,7 @@ environment:
       - gnutar
       - openssl
       - xz
+      - zstd
 
 pipeline:
   - uses: git-checkout
@@ -56,7 +53,7 @@ pipeline:
 
 subpackages:
   - name: kernel-core
-    description: The Linux kernel core
+    description: The Linux kernel
     pipeline:
       - runs: |
           mkdir -p ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}
@@ -65,14 +62,24 @@ subpackages:
           cp .config ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/config
 
   - name: kernel-modules
-    description: Kernel modules for Linux
+    description: Kernel modules
     dependencies:
       runtime:
         - kernel-core
     pipeline:
-      - uses: autoconf/make-install
+      - uses: autoconf/make
         with:
-          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr INSTALL_MOD_COMPRESS=xz
+          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
+
+      - runs: |
+          echo "Compressing kernel modules with xz..."
+          find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' -print0 | xargs -0 -n1 -P$(nproc) xz -T1 --check=crc32 --lzma2=dict=1MiB
+
+          echo "Verifying all modules are compressed..."
+          if find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' | grep -q .; then
+            echo "ERROR: Uncompressed .ko files remain!" >&2
+            exit 1
+          fi
 
   - name: kernel-headers
     description: Kernel headers
@@ -80,6 +87,6 @@ subpackages:
       runtime:
         - kernel-core
     pipeline:
-      - uses: autoconf/make-install
+      - uses: autoconf/make
         with:
           opts: headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}
