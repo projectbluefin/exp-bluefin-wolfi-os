@@ -1,7 +1,7 @@
 package:
   name: kernel
   version: 6.15.6
-  epoch: 1
+  epoch: 2
   description: The Linux kernel
   copyright:
     - license: GPL-2.0
@@ -28,7 +28,7 @@ environment:
       - zstd
 
 pipeline:
-  - uses: git
+  - uses: git-checkout
     with:
       repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
       tag: v${{package.version}}
@@ -46,47 +46,46 @@ pipeline:
       TMPDIR: /home/build/tmp
     uses: autoconf/make
 
-subpackages:
-  - name: kernel-core
-    description: The Linux kernel
-    pipeline:
-      - runs: |
-          kernel_version=$(make kernelversion)
-          mkdir -p ${{targets.subpkgdir}}/usr/lib/${kernel_version}
-          cp ./arch/${{build.arch}}/boot/bzImage ${{targets.subpkgdir}}/usr/lib/${kernel_version}/vmlinuz
-          cp System.map ${{targets.subpkgdir}}/usr/lib/${kernel_version}/System.map
-          cp .config ${{targets.subpkgdir}}/usr/lib/${kernel_version}/config
-          mkdir -p ${{targets.subpkgdir}}/usr/lib
+  - uses: autoconf/make
+    environment:
+      INSTALL_HDR_PATH: ${{targets.destdir}}
+    with:
+      opts: headers_install
 
+  - runs: |
+      install -Dpm0644 ./arch/${{build.arch}}/boot/bzImage "${{targets.destdir}}/usr/lib/modules/${{package.version}}/vmlinuz"
+      install -Dpm0644 .config ${{targets.destdir}}/usr/lib/modules/${{package.version}}/config
+      install -Dpm0644 -t "${{targets.destdir}}/usr/lib/modules/${{package.version}}/" ./System.map
+
+subpackages:
   - name: kernel-modules
     description: Kernel modules
-    dependencies:
-      runtime:
-        - kernel-core
     pipeline:
       - uses: autoconf/make
+        environment:
+          INSTALL_MOD_PATH: ${{targets.subpkgdir}}/usr
         with:
-          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
-
+          opts: modules_install
       - runs: |
           echo "Compressing kernel modules with xz..."
           find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' -print0 | xargs -0 -n1 -P$(nproc) xz -T1 --check=crc32 --lzma2=dict=1MiB
+    test:
+      pipeline:
+        - runs: |
+            stat "/usr/lib/modules/${{package.version}}" | grep -F -e "0755"
+            test -d "/usr/lib/modules/${{package.version}}"
+            if find /usr/lib/modules/${{package.version}} -type f -name '*.ko' | grep -q .; then
+              print "%s" "Found uncompressed kernel object files" >&2
+              exit 1
+            fi
 
-          echo "Verifying all modules are compressed..."
-          if find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' | grep -q .; then
-            echo "ERROR: Uncompressed .ko files remain!" >&2
-            exit 1
-          fi
-
-  - name: kernel-headers
+  - name: kernel-dev
     description: Kernel headers
-    dependencies:
-      runtime:
-        - kernel-core
     pipeline:
-      - uses: autoconf/make
-        with:
-          opts: headers_install INSTALL_HDR_PATH=${{targets.subpkgdir}}
+      - uses: split/dev
+    test:
+      pipeline:
+        - uses: test/tw/ldd-check
 
 update:
   enabled: true
@@ -94,4 +93,3 @@ update:
     - ".*-rc.*"
   release-monitor:
     identifier: 358810
-
