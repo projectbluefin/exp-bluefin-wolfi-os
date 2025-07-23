@@ -50,10 +50,8 @@ pipeline:
   - uses: autoconf/make
 
   - uses: autoconf/make
-    environment:
-      INSTALL_HDR_PATH: ${{targets.destdir}}
     with:
-      opts: headers_install
+      opts: headers_install INSTALL_HDR_PATH=${{targets.destdir}}/usr
 
   - runs: |
       install -Dpm0644 ./arch/${{build.arch}}/boot/bzImage "${{targets.destdir}}/usr/lib/modules/${{package.version}}/vmlinuz"
@@ -65,19 +63,17 @@ subpackages:
     description: Kernel modules
     pipeline:
       - uses: autoconf/make
-        environment:
-          INSTALL_MOD_PATH: ${{targets.subpkgdir}}/usr
         with:
-          opts: modules_install
+          opts: modules_install INSTALL_MOD_PATH=${{targets.subpkgdir}}/usr
       - runs: |
           echo "Compressing kernel modules with xz..."
           find ${{targets.subpkgdir}}/usr/lib/modules/ -type f -name '*.ko' -print0 | xargs -0 -n1 -P$(nproc) xz -T1 --check=crc32 --lzma2=dict=1MiB
     test:
       pipeline:
         - runs: |
-            stat "/usr/lib/modules/${{package.version}}" | grep -F -e "0755"
-            test -d "/usr/lib/modules/${{package.version}}"
-            if find /usr/lib/modules/${{package.version}} -type f -name '*.ko' | grep -q .; then
+            stat "${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}" | grep -F -e "0755"
+            test -d "${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}"
+            if find "${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}" -type f -name '*.ko' | grep -q .; then
               print "%s" "Found uncompressed kernel object files" >&2
               exit 1
             fi
