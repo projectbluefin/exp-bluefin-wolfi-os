@@ -20,7 +20,7 @@ environment:
       - build-base
       - binutils-dev
       - wolfi-baselayout
-      - kernel-core
+      - kernel
       - kernel-modules
       - kernel-initramfs
       - systemd-ukify
