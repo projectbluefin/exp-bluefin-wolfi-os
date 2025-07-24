@@ -5,8 +5,6 @@ package:
   version: 6.15.6
   epoch: 1
   description: Unified Kernel Image (UKI) for the Linux kernel
-  target-architecture:
-    - x86_64
   copyright:
     - license: GPL-2.0
   dependencies:
@@ -23,6 +21,8 @@ environment:
       - kernel-core
       - kernel-modules
       - kernel-initramfs
+      - systemd
+      - systemd-dev
       - systemd-ukify
       - systemd-uki-tools
       - systemd-measure
@@ -34,9 +34,9 @@ environment:
 
 pipeline:
   - runs: |
-      mkdir -p ${{targets.destdir}}/usr/lib/efi
+      mkdir -p ${{targets.destdir}}/usr/lib/efi/EFI
       ukify build \
         --measure \
-        --linux=/usr/lib/modules/${{package.version}}/vmlinuz \
+        --linux=./vmlinuz \
         --initrd=/usr/lib/modules/${{package.version}}/initramfs.img \
         --output=${{targets.destdir}}/usr/lib/efi/EFI
