@@ -9,7 +9,7 @@ package:
     - license: GPL-2.0
   dependencies:
     runtime:
-      - kernel-core
+      - kernel
       - kernel-modules
       - kernel-initramfs
       - zstd
@@ -22,7 +22,7 @@ environment:
       - bash
       - binutils-dev
       - wolfi-baselayout
-      - kernel-core
+      - kernel
       - kernel-modules
       - dracut
       - kmod
