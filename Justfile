@@ -78,7 +78,12 @@ bootc *ARGS:
     sudo podman run \
         --rm --privileged --pid=host \
         -it \
+        -w /data \
+        -v ./wrapper.sh:/usr/bin/bootupctl \
+        -v ./wrapper.sh:/usr/bin/bootupd \
+        -v ./files/prepare-root.conf:/usr/lib/ostree/prepare-root.conf \
         -v /sys/fs/selinux:/sys/fs/selinux \
+        -v /usr/share/factory/etc/containers:/usr/share/factory/etc/containers:Z \
         -v /etc/containers:/etc/containers:Z \
         -v /var/lib/containers:/var/lib/containers \
         -v /dev:/dev \
@@ -92,3 +97,21 @@ generate-bootable-image:
         fallocate -l 20G bootable.img
     fi
     just bootc install to-disk --via-loopback /data/bootable.img --filesystem ext4
+
+local-wolfi:
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    REPOS_FILE="$(mktemp)"
+    trap 'rm ${REPOS_FILE}' EXIT
+    chmod -v 0644 "${REPOS_FILE}"
+    tee "${REPOS_FILE}" <<EOF
+    https://packages.wolfi.dev/os
+    /work/packages
+    EOF
+
+    podman run --pull=always --rm -it \
+        --mount type=bind,source="${PWD}/packages",destination="/work/packages",readonly \
+        --mount type=bind,source="${PWD}/${SIGNING_KEY_PATH}.pub",destination="/etc/apk/keys/${SIGNING_KEY_PATH}.pub",readonly \
+        --mount type=bind,source="${REPOS_FILE}",destination="/etc/apk/repositories",readonly \
+        -w "/work/packages" \
+        cgr.dev/chainguard/wolfi-base:latest

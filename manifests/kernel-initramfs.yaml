@@ -11,33 +11,34 @@ package:
     runtime:
       - kernel-core
       - kernel-modules
-      - kernel-initramfs
       - zstd
 
 environment:
   contents:
     packages:
-      - busybox
-      - build-base
+      - attr
       - bash
+      - busybox
       - binutils-dev
-      - wolfi-baselayout
+      - btrfs-progs
+      - build-base
+      - composefs-rs
+      - coreutils
+      - cryptsetup
+      - device-mapper
+      - dracut
+      # For modules
       - kernel-core
       - kernel-modules
-      - dracut
       - kmod
-      - zstd
-      - posix-libc-utils
-      - attr
-      # For modules
       - lvm2
-      - cryptsetup
-      - btrfs-progs
-      - systemd
-      - util-linux
-      - device-mapper
       - openssl
-      - composefs-setup-root
+      - posix-libc-utils
+      - systemd
+      - udev
+      - util-linux
+      - wolfi-baselayout
+      - zstd
 
 pipeline:
   - runs: |
@@ -47,5 +48,12 @@ pipeline:
         --kver ${{package.version}} --omit busybox \
         ${{targets.destdir}}/usr/lib/modules/${{package.version}}/initramfs.img
 
-  - runs: |
-      ls -la ${{targets.destdir}}/usr/lib/modules/${{package.version}}/
+
+test:
+  pipeline:
+    - name: Check if initramfs exists with right permissions
+      runs: |
+        stat ${{targets.destdir}}/usr/lib/modules/${{package.version}}/initramfs.img | grep -F -e "0644"
+
+update:
+  enabled: false

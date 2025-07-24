@@ -18,6 +18,11 @@ pipeline:
       branch: composefs-backend
       expected-commit: 04f048f855fe64352af8bdf9c7eab87b123e3a9a
 
+  # FORCE IT TO NOT USE BOOTUPD
+  - uses: patch
+    with:
+      patches: composefs-stuff.patch
+
   - uses: cargo/build
     with:
       output: bootc
