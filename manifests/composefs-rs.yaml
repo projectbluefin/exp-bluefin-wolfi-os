@@ -9,7 +9,7 @@ package:
 environment:
   contents:
     packages:
-      - ostree-dev
+      - openssl-dev
 
 pipeline:
   - uses: git-checkout
@@ -29,8 +29,14 @@ subpackages:
     description: Dracut modules for composefs-rs
     pipeline:
     - runs: |
-        install -Dpm0755 -t "${{targets.destdir}}/usr/lib/dracut/modules.d/37composefs/" target/release/composefs-setup-root ./module-setup.sh
-        install -Dpm0644 -t "${{targets.destdir}}/usr/lib/dracut/modules.d/37composefs/" ./composefs-setup-root.service 
+        install -Dpm0755 -t "${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/" target/release/composefs-setup-root ./module-setup.sh
+        install -Dpm0644 -t "${{targets.subpkgdir}}/usr/lib/dracut/modules.d/37composefs/" ./composefs-setup-root.service 
+
+  - name: ${{package.name}}-cfsctl
+    description: Composefs utility
+    pipeline:
+    - runs: |
+        install -Dpm0755 -t "${{targets.subpkgdir}}/usr/bin/" target/release/cfsctl
 
 test:
   pipeline:
