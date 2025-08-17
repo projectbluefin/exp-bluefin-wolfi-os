@@ -5,3 +5,4 @@ packages/
 .cache/
 melange.rsa*
 output/
+bootable.img
