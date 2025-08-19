@@ -47,6 +47,7 @@ build-tree:
     just build composefs
     just build ostree
     just build bootc
+    just build bootupd
 
     just build composefs-rs
     just build dracut
@@ -62,8 +63,12 @@ renovate:
     GITHUB_COM_TOKEN=$(cat ~/.ssh/gh_renovate) LOG_LEVEL=${LOG_LEVEL:-debug} renovate --platform=local
 
 build-containerfile:
-    sudo podman build \
+    podman build \
         -t wolfi-bootc:latest .
+    # Save the image to a tar file
+    rm -f ./output/oci/wolfi-bootc.tar
+    podman save wolfi-bootc:latest -o ./output/oci/wolfi-bootc.tar
+    sudo podman load < ./output/oci/wolfi-bootc.tar
 
 build-apko $yaml="apko.yaml" $tag="wolfi-bootc:latest" $tar="wolfi-bootc.tar":
     mkdir -p ./output/oci
@@ -91,4 +96,5 @@ generate-bootable-image:
     if [ ! -e ./bootable.img ] ; then
         fallocate -l 20G bootable.img
     fi
-    just bootc install to-disk --via-loopback /data/bootable.img --filesystem ext4
+    # just bootc install to-disk --via-loopback /data/bootable.img --filesystem ext4 --wipe --bootloader grub
+    just bootc install to-disk --composefs-native --via-loopback /data/bootable.img --filesystem ext4 --wipe

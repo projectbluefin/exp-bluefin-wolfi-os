@@ -1,21 +1,45 @@
 contents:
   packages:
-    - apk-tools
-    - ca-certificates-bundle
+    - bootc-baselayout
+    - coreutils
+    - posix-libc-utils
+    - ostree
+    - bootc
+    - bootupd
+    - e2fsprogs
+    - composefs
     - kernel-uki
     - systemd
-    - bootc
-    # - podman # https://github.com/wolfi-dev/os/issues/60292
-    - skopeo
-    - bash
-    - coreutils
-    - merged-bin
-    - file
+    - systemd-init
+    - systemd-logind-service
+    - systemd-boot
+    - strace
+    - libselinux
+    - findmnt
     - btrfs-progs
+    - xfsprogs
+    - udev
+    - cpio
+    - losetup
+    - lsblk
+    - binutils
+    - sfdisk
+    - dosfstools
+    - conmon
+    - crun
+    - netavark
+    - wipefs
+    - skopeo
+    - util-linux-login
+    - dbus
+    - dbus-glib
+    - glib
+    - shadow
+    - gzip
 
 archs:
   - x86_64
 
-layering:
-  strategy: origin
-  budget: 50
+# layering:
+#   strategy: origin
+#   budget: 50

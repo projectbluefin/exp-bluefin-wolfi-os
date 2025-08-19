@@ -1,6 +1,6 @@
 package:
   name: bootupd
-  version: 0.2.28
+  version: 0.2.29
   epoch: 2
   description: Bootloader updater
   copyright:
@@ -16,7 +16,11 @@ pipeline:
     with:
       repository: https://github.com/coreos/bootupd
       tag: v${{package.version}}
-      expected-commit: 766bb80cbe22bcaba3f4c466385bf38d089f2917
+      expected-commit: a3510c52e87eba210d0e3d5b548a768ef07574a1
+
+  # - uses: patch
+  #   with:
+  #     patches: 0001-feat-support-for-systemd-boot-install.patch
 
   - uses: cargo/build
     with:

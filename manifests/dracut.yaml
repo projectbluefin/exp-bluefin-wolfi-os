@@ -5,6 +5,11 @@ package:
   description: Initramfs generator using udev
   copyright:
     - license: GPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only
+  dependencies:
+    runtime:
+      - cpio
+      - coreutils
+      - udev
 
 environment:
   contents:

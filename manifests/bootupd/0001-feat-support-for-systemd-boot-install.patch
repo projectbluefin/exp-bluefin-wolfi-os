@@ -1,0 +1,256 @@
+From 5907886ec4300747464c5ec209c7efc596fbb357 Mon Sep 17 00:00:00 2001
+From: Robert Sturla <robertsturla@outlook.com>
+Date: Sun, 3 Aug 2025 10:57:35 +0100
+Subject: [PATCH] feat: support for systemd-boot install
+
+---
+ src/efi.rs  | 192 ++++++++++++++++++++++++++++++++++++++--------------
+ src/main.rs |   3 +
+ 2 files changed, 145 insertions(+), 50 deletions(-)
+
+diff --git a/src/efi.rs b/src/efi.rs
+index ee42e26..00e546d 100644
+--- a/src/efi.rs
++++ b/src/efi.rs
+@@ -51,6 +51,13 @@ pub(crate) const SHIM: &str = "shimriscv64.efi";
+ const LOADER_INFO_VAR_STR: &str = "LoaderInfo-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+ const STUB_INFO_VAR_STR: &str = "StubInfo-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f";
+ 
++/// The type of EFI bootloader we are dealing with.
++#[derive(Debug, Clone, PartialEq)]
++pub(crate) enum EfiBootloaderType {
++    Grub,
++    SystemdBoot,
++}
++
+ /// Return `true` if the system is booted via EFI
+ pub(crate) fn is_efi_booted() -> Result<bool> {
+     Path::new("/sys/firmware/efi")
+@@ -220,17 +227,7 @@ fn get_stub_info() -> Option<String> {
+ 
+ /// Whether to skip adoption if a systemd bootloader is found.
+ fn skip_systemd_bootloaders() -> bool {
+-    if let Some(loader_info) = get_loader_info() {
+-        if loader_info.starts_with("systemd") {
+-            log::trace!("Skipping adoption for {:?}", loader_info);
+-            return true;
+-        }
+-    }
+-    if let Some(stub_info) = get_stub_info() {
+-        log::trace!("Skipping adoption for {:?}", stub_info);
+-        return true;
+-    }
+-    false
++    matches!(detect_efi_bootloader(), EfiBootloaderType::SystemdBoot)
+ }
+ 
+ impl Component for Efi {
+@@ -343,50 +340,130 @@ impl Component for Efi {
+         device: &str,
+         update_firmware: bool,
+     ) -> Result<InstalledContent> {
+-        let Some(meta) = get_component_update(src_root, self)? else {
+-            anyhow::bail!("No update metadata for component {} found", self.name());
+-        };
+-        log::debug!("Found metadata {}", meta.version);
+-        let srcdir_name = component_updatedirname(self);
+-        let ft = crate::filetree::FileTree::new_from_dir(&src_root.sub_dir(&srcdir_name)?)?;
++        let bootloader_type = detect_efi_bootloader();
++        match bootloader_type {
++            EfiBootloaderType::Grub => {
++                log::debug!("Detected GRUB bootloader");
+ 
+-        // Let's attempt to use an already mounted ESP at the target
+-        // dest_root if one is already mounted there in a known ESP location.
+-        let destpath = if let Some(destdir) = self.get_mounted_esp(Path::new(dest_root))? {
+-            destdir
+-        } else {
+-            // Using `blockdev` to find the partition instead of partlabel because
+-            // we know the target install toplevel device already.
+-            if device.is_empty() {
+-                anyhow::bail!("Device value not provided");
++                let Some(meta) = get_component_update(src_root, self)? else {
++                    anyhow::bail!("No update metadata for component {} found", self.name());
++                };
++                log::debug!("Found metadata {}", meta.version);
++                let srcdir_name = component_updatedirname(self);
++                let ft = crate::filetree::FileTree::new_from_dir(&src_root.sub_dir(&srcdir_name)?)?;
++
++                // Let's attempt to use an already mounted ESP at the target
++                // dest_root if one is already mounted there in a known ESP location.
++                let destpath = if let Some(destdir) = self.get_mounted_esp(Path::new(dest_root))? {
++                    destdir
++                } else {
++                    // Using `blockdev` to find the partition instead of partlabel because
++                    // we know the target install toplevel device already.
++                    if device.is_empty() {
++                        anyhow::bail!("Device value not provided");
++                    }
++                    let esp_device = blockdev::get_esp_partition(device)?
++                        .ok_or_else(|| anyhow::anyhow!("Failed to find ESP device"))?;
++                    self.mount_esp_device(Path::new(dest_root), Path::new(&esp_device))?
++                };
++
++                let destd = &openat::Dir::open(&destpath)
++                    .with_context(|| format!("opening dest dir {}", destpath.display()))?;
++                validate_esp_fstype(destd)?;
++
++                // TODO - add some sort of API that allows directly setting the working
++                // directory to a file descriptor.
++                std::process::Command::new("cp")
++                    .args(["-rp", "--reflink=auto"])
++                    .arg(&srcdir_name)
++                    .arg(destpath)
++                    .current_dir(format!("/proc/self/fd/{}", src_root.as_raw_fd()))
++                    .run()?;
++                if update_firmware {
++                    if let Some(vendordir) = self.get_efi_vendor(&src_root)? {
++                        self.update_firmware(device, destd, &vendordir)?
++                    }
++                }
++                Ok(InstalledContent {
++                    meta,
++                    filetree: Some(ft),
++                    adopted_from: None,
++                })
+             }
+-            let esp_device = blockdev::get_esp_partition(device)?
+-                .ok_or_else(|| anyhow::anyhow!("Failed to find ESP device"))?;
+-            self.mount_esp_device(Path::new(dest_root), Path::new(&esp_device))?
+-        };
++            EfiBootloaderType::SystemdBoot => {
++                log::debug!("Detected systemd-boot");
+ 
+-        let destd = &openat::Dir::open(&destpath)
+-            .with_context(|| format!("opening dest dir {}", destpath.display()))?;
+-        validate_esp_fstype(destd)?;
+-
+-        // TODO - add some sort of API that allows directly setting the working
+-        // directory to a file descriptor.
+-        std::process::Command::new("cp")
+-            .args(["-rp", "--reflink=auto"])
+-            .arg(&srcdir_name)
+-            .arg(destpath)
+-            .current_dir(format!("/proc/self/fd/{}", src_root.as_raw_fd()))
+-            .run()?;
+-        if update_firmware {
+-            if let Some(vendordir) = self.get_efi_vendor(&src_root)? {
+-                self.update_firmware(device, destd, &vendordir)?
++                let Some(meta) = get_component_update(src_root, self)? else {
++                    anyhow::bail!("No update metadata for component {} found", self.name());
++                };
++
++                // Mount ESP
++                let destpath = if let Some(destdir) = self.get_mounted_esp(Path::new(dest_root))? {
++                    destdir
++                } else {
++                    if device.is_empty() {
++                        anyhow::bail!("Device value not provided");
++                    }
++                    let esp_device = blockdev::get_esp_partition(device)?
++                        .ok_or_else(|| anyhow::anyhow!("Failed to find ESP device"))?;
++                    self.mount_esp_device(Path::new(dest_root), Path::new(&esp_device))?
++                };
++
++                // Copy systemd-boot files (systemd-bootx64.efi, loader.conf, entries)
++                let esp_loader_dir = destpath.join("EFI").join("systemd");
++                std::fs::create_dir_all(&esp_loader_dir)
++                    .with_context(|| format!("Creating directory {:?}", esp_loader_dir))?;
++                let src_bootefi = src_root
++                    .sub_dir("usr/lib/efi/systemd")?
++                    .open_file(Path::new("systemd-bootx64.efi"))?;
++                let dest_bootefi = esp_loader_dir.join("systemd-bootx64.efi");
++                {
++                    let mut src_file = src_bootefi;
++                    let mut dest_file = std::fs::File::create(&dest_bootefi)
++                        .with_context(|| format!("Creating {:?}", dest_bootefi))?;
++                    std::io::copy(&mut src_file, &mut dest_file).with_context(|| {
++                        format!("Copying systemd-bootx64.efi to {:?}", dest_bootefi)
++                    })?;
++                }
++
++                // Copy loader.conf and entries
++                let src_loader_conf = src_root.sub_dir("usr/lib/efi")?.open_file("loader.conf")?;
++                let dest_loader_conf = esp_loader_dir.join("loader.conf");
++                {
++                    let mut src_file = src_loader_conf;
++                    let mut dest_file = std::fs::File::create(&dest_loader_conf)
++                        .with_context(|| format!("Creating {:?}", dest_loader_conf))?;
++                    std::io::copy(&mut src_file, &mut dest_file).with_context(|| {
++                        format!("Copying loader.conf to {:?}", dest_loader_conf)
++                    })?;
++                }
++
++                // Run bootctl to update loader entries
++                Command::new("bootctl")
++                    .args(["install", "--esp-path", destpath.to_str().unwrap()])
++                    .status()
++                    .with_context(|| format!("Failed to run bootctl install"))?;
++
++                if update_firmware {
++                    Command::new("bootctl")
++                        .args(["update", "--esp-path", destpath.to_str().unwrap()])
++                        .status()
++                        .with_context(|| format!("Failed to run bootctl update"))?;
++                }
++
++                let destdir = openat::Dir::open(&destpath)
++                    .with_context(|| format!("opening dest dir {}", destpath.display()))?;
++                let ft = crate::filetree::FileTree::new_from_dir(&destdir)
++                    .context("reading update dir")?;
++
++                // Return InstalledComponent
++                Ok(InstalledContent {
++                    meta,
++                    filetree: ft.into(),
++                    adopted_from: None,
++                })
+             }
+         }
+-        Ok(InstalledContent {
+-            meta,
+-            filetree: Some(ft),
+-            adopted_from: None,
+-        })
+     }
+ 
+     fn run_update(
+@@ -571,6 +648,21 @@ impl Component for Efi {
+     }
+ }
+ 
++/// Detect the current EFI bootloader type based on the LoaderInfo and StubInfo EFI variables.
++fn detect_efi_bootloader() -> EfiBootloaderType {
++    if let Some(loader_info) = get_loader_info() {
++        if loader_info.starts_with("systemd") {
++            log::trace!("Detected systemd-boot via LoaderInfo: {loader_info}");
++            return EfiBootloaderType::SystemdBoot;
++        }
++    }
++    if let Some(stub_info) = get_stub_info() {
++        log::trace!("Detected systemd-boot via StubInfo: {stub_info}");
++        return EfiBootloaderType::SystemdBoot;
++    }
++    EfiBootloaderType::Grub
++}
++
+ impl Drop for Efi {
+     fn drop(&mut self) {
+         log::debug!("Unmounting");
+diff --git a/src/main.rs b/src/main.rs
+index 5554366..b21901a 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -48,6 +48,9 @@ mod packagesystem;
+ mod sha512string;
+ mod util;
+ 
++// #[cfg(any(target_arch = "x86_64"))]
++// mod systemd_boot;
++
+ use clap::crate_name;
+ 
+ /// Binary entrypoint, for both daemon and client logic.
+-- 
+2.50.1
+

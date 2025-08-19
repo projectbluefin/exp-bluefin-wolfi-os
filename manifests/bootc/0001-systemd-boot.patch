@@ -1,0 +1,135 @@
+From 95c1cacb4c2b42ef29cce7bb6eba1d74f59fec79 Mon Sep 17 00:00:00 2001
+From: Robert Sturla <robertsturla@outlook.com>
+Date: Mon, 4 Aug 2025 23:34:26 +0100
+Subject: [PATCH] chore: hardcode uki path
+
+---
+ crates/lib/src/bootloader.rs | 67 ++++++++++++++++++++++++++++++++++++
+ crates/lib/src/install.rs    | 30 ++++++++++++----
+ 2 files changed, 91 insertions(+), 6 deletions(-)
+
+diff --git a/crates/lib/src/bootloader.rs b/crates/lib/src/bootloader.rs
+index 0f02198a..d99cb9ed 100644
+--- a/crates/lib/src/bootloader.rs
++++ b/crates/lib/src/bootloader.rs
+@@ -117,3 +117,70 @@ pub(crate) fn install_via_zipl(device: &PartitionTable, boot_uuid: &str) -> Resu
+         .log_debug()
+         .run_inherited_with_cmd_context()
+ }
++
++pub(crate) fn install_via_systemd_boot(
++    device: &PartitionTable,
++    boot_uuid: &str,
++) -> Result<()> {
++    // Identify the target boot partition from UUID
++    let fs = mount::inspect_filesystem_by_uuid(boot_uuid)?;
++    let boot_dir = Utf8Path::new(&fs.target);
++    let maj_min = fs.maj_min;
++
++    // Ensure that the found partition is a part of the target device
++    let device_path = device.path();
++
++    let partitions = bootc_blockdev::list_dev(device_path)?
++        .children
++        .with_context(|| format!("no partition found on {device_path}"))?;
++    let boot_part = partitions
++        .iter()
++        .find(|part| part.maj_min.as_deref() == Some(maj_min.as_str()))
++        .with_context(|| format!("partition device {maj_min} is not on {device_path}"))?;
++    let boot_part_offset = boot_part.start.unwrap_or(0);
++
++    // Hardcoded UKI path
++    let src_uki = "/usr/lib/efi/EFI";
++    let entry = "EFI";
++    let dest_uki = boot_dir.join("EFI/Linux").join("EFI.efi");
++    std::fs::create_dir_all(dest_uki.parent().unwrap())?;
++    std::fs::copy(src_uki, &dest_uki)?;
++    set_default_uki_entry(&boot_dir, entry)?;
++
++    // Execute the systemd-boot command to install bootloader
++    println!("Running systemd-boot on {device_path}");
++    Command::new("bootctl")
++        .args(["install", "--path", boot_dir.as_str()])
++        .args(["--bootloader-id", "systemd-boot"])
++        .args(["--target", device_path.as_str()])
++        .args(["--targetblocksize", "512"])
++        .args(["--targetoffset", &boot_part_offset.to_string()])
++        .log_debug()
++        .run_inherited_with_cmd_context()
++}
++
++/// Set the default UKI entry by writing loader.conf
++pub(crate) fn set_default_uki_entry(boot_dir: &Utf8Path, entry_name: &str) -> Result<()> {
++    use std::fs::write;
++    let loader_conf = boot_dir.join("loader/loader.conf");
++    std::fs::create_dir_all(loader_conf.parent().unwrap())?;
++    let content = format!("default EFI/Linux/{}.efi\n", entry_name);
++    write(&loader_conf, content)?;
++    Ok(())
++}
++
++/// Automatically detect a UKI file from /boot/EFI/Linux
++#[allow(dead_code)]
++pub(crate) fn detect_uki_file(boot_dir: &Utf8Path) -> Result<(String, String)> {
++    let efi_dir = boot_dir.join("EFI/Linux");
++    if let Ok(read_dir) = efi_dir.read_dir_utf8() {
++        for entry in read_dir.flatten() {
++            let path = entry.path();
++            if path.extension() == Some("efi") {
++                let name = path.file_stem().unwrap_or("").to_string();
++                return Ok((name, path.to_string()));
++            }
++        }
++    }
++    Err(anyhow!("No UKI .efi file found in {}", efi_dir))
++}
+diff --git a/crates/lib/src/install.rs b/crates/lib/src/install.rs
+index 7ab76639..397b00fe 100644
+--- a/crates/lib/src/install.rs
++++ b/crates/lib/src/install.rs
+@@ -241,6 +241,11 @@ pub(crate) struct InstallConfigOpts {
+     /// The stateroot name to use. Defaults to `default`.
+     #[clap(long)]
+     pub(crate) stateroot: Option<String>,
++
++    /// The bootloader type to install.  This is a string that is passed to the
++    /// bootloader installation command.
++    #[clap(long)]
++    pub(crate) bootloader: String,
+ }
+
+ #[derive(
+@@ -1462,12 +1467,25 @@ async fn install_with_sysroot(
+         // TODO: Integrate s390x support into install_via_bootupd
+         crate::bootloader::install_via_zipl(&rootfs.device_info, boot_uuid)?;
+     } else {
+-        crate::bootloader::install_via_bootupd(
+-            &rootfs.device_info,
+-            &rootfs.physical_root_path,
+-            &state.config_opts,
+-            Some(&deployment_path.as_str()),
+-        )?;
++        match state.config_opts.bootloader.as_str() {
++            "grub" => {
++                crate::bootloader::install_via_bootupd(
++                    &rootfs.device_info,
++                    &rootfs.physical_root_path,
++                    &state.config_opts,
++                    Some(&deployment_path.as_str()),
++                )?;
++            }
++            "systemd-boot" => {
++                crate::bootloader::install_via_systemd_boot(
++                    &rootfs.device_info,
++                    boot_uuid,
++                )?;
++            }
++            _ => {
++                anyhow::bail!("Unsupported bootloader type: {}", state.config_opts.bootloader);
++            }
++        }
+     }
+     tracing::debug!("Installed bootloader");
+
+--
+2.50.1
