@@ -37,7 +37,7 @@ environment:
       - util-linux
       - device-mapper
       - openssl
-      - composefs-setup-root
+      - composefs-rs-dracut
 
 pipeline:
   - runs: |

@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/chainguard-dev/melange/refs/heads/main/pkg/config/schema.json
+
 package:
   name: kernel
   version: 6.15.6
@@ -5,6 +7,9 @@ package:
   description: The Linux kernel
   copyright:
     - license: GPL-2.0
+  dependencies:
+    runtime:
+      - zstd
 
 environment:
   contents:
@@ -61,6 +66,9 @@ pipeline:
 subpackages:
   - name: kernel-modules
     description: Kernel modules
+    dependencies:
+      runtime:
+        - xz
     pipeline:
       - uses: autoconf/make
         with:

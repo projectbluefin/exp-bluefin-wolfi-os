@@ -14,12 +14,6 @@ export APKO_OPTS := "
     --repository-append https://packages.wolfi.dev/os
     --keyring-append https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
 
-generate-signing-key:
-    podman run \
-        --rm -it -v "${PWD}:/work:Z" --privileged \
-        cgr.dev/chainguard/melange \
-        keygen
-
 create-cache-dir:
     mkdir -p ./.cache/apk-cache
     mkdir -p ./.cache/melange
@@ -47,6 +41,7 @@ build-tree:
     just build composefs
     just build ostree
     just build bootc
+    just build bootupd
 
     just build composefs-rs
     just build dracut
@@ -91,4 +86,4 @@ generate-bootable-image:
     if [ ! -e ./bootable.img ] ; then
         fallocate -l 20G bootable.img
     fi
-    just bootc install to-disk --via-loopback /data/bootable.img --filesystem ext4
+    just bootc install to-disk --composefs-native --via-loopback /data/bootable.img --filesystem ext4 --wipe

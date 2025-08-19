@@ -22,6 +22,10 @@ pipeline:
     with:
       output: bootc
 
+  - runs: |
+      mkdir -p ${{ targets.destdir }}/usr/lib/ostree/
+      cp prepare-root.conf ${{ targets.destdir }}/usr/lib/ostree/prepare-root.conf
+
   - uses: strip
 
 test:
