@@ -1,0 +1,97 @@
+package:
+  name: bootc-baselayout
+  version: 20230201
+  epoch: 23
+  description: "baselayout data for Wolfi-based bootc images"
+  copyright:
+    - license: MIT
+  dependencies:
+    runtime:
+      - ca-certificates-bundle
+    provides:
+      - merged-sbin
+      - merged-bin
+      - merged-usrsbin
+      - merged-lib
+    replaces:
+      - wolfi-baselayout
+  checks:
+    disabled:
+      # fails "usrlocal" linter because it creates /usr/local/lib64
+      - usrmerge
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - wolfi-baselayout
+
+pipeline:
+  - name: Generate /etc/shadow
+    runs: |
+      # Set a '*' for the root password to make scanners happy
+      awk -F: '{
+          pw = ":!:"
+          if ($1 == "root") { pw = ":*:" }
+          print($1 pw ":0:::::")
+      }' vendor/etc/passwd > vendor/etc/shadow
+  - name: Generate /etc/os-release
+    runs: |
+      cat >vendor/etc/os-release <<EOF
+      ID=wolfi
+      NAME="Wolfi"
+      PRETTY_NAME="Wolfi"
+      VERSION_ID="${{package.version}}"
+      HOME_URL="https://wolfi.dev"
+      BUG_REPORT_URL="https://github.com/wolfi-dev/os/issues"
+      EOF
+  - name: Install
+    runs: |
+      for i in dev etc etc/profile.d etc/secfixes.d var/home proc var/roothome var/log usr/bin usr/local/lib sys tmp var/spool/cron opt run usr/lib; do
+        mkdir -p "${{targets.destdir}}"/${i}
+      done
+      # bootc enablement (/home -> /var/home, /root -> /var/roothome)
+      ln -s var/home "${{targets.destdir}}"/home
+      ln -s var/roothome "${{targets.destdir}}"/root
+      ln -s var/usrlocal "${{targets.destdir}}"/usr/local
+      ln -s var/srv "${{targets.destdir}}"/srv
+      # usr-merge
+      ln -sf usr/bin ${{targets.destdir}}/sbin
+      ln -sf usr/bin ${{targets.destdir}}/bin
+      ln -sf bin ${{targets.destdir}}/usr/sbin
+      ln -sf usr/lib ${{targets.destdir}}/lib
+      ln -sf usr/lib ${{targets.destdir}}/lib64
+      ln -sf lib ${{targets.destdir}}/usr/lib64
+      ln -sf lib ${{targets.destdir}}/usr/local/lib64
+      for i in etc/passwd etc/group etc/shadow etc/services etc/hosts etc/profile etc/shells etc/protocols etc/profile.d/locale.sh etc/nsswitch.conf etc/os-release etc/secfixes.d/wolfi; do
+        install -m644 vendor/${i} "${{targets.destdir}}"/${i}
+      done
+      install -m600 vendor/etc/shadow "${{targets.destdir}}"/etc/shadow
+      ln -s /etc/crontabs "${{targets.destdir}}"/var/spool/cron/crontabs
+      ln -s /proc/mounts "${{targets.destdir}}"/etc/mtab
+      ln -s /var/mail "${{targets.destdir}}"/var/spool/mail
+      echo 'multi on' > "${{targets.destdir}}"/etc/host.conf
+      chmod 0700 "${{targets.destdir}}"/root
+      mkdir -p "${{targets.destdir}}"/var/empty
+      chmod 755 "${{targets.destdir}}"/var/empty
+test:
+  pipeline:
+    - name: "Files exist"
+      runs: |
+        test -f /etc/passwd
+        test -f /etc/shadow
+        test -f /etc/os-release
+        test -f /etc/host.conf
+        test -d /var/empty
+    - name: "Scanner expectations"
+      runs: |
+        # This tells scanners which feed to look at.
+        grep 'ID=wolfi' /etc/os-release
+        # This tells most scanners which of a vendor's feeds to look at,
+        # but as a rolling distro we should never be changing this, so
+        # instead of using ${{package.version}} we hardcode this here
+        # because only the epoch should really ever change.
+        grep 'VERSION_ID="20230201"' /etc/os-release
+update:
+  enabled: false
+  exclude-reason: "bootc-baselayout is a static layout package"
