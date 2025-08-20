@@ -1,6 +1,6 @@
 package:
   name: dracut
-  version: "107"
+  version: "108"
   epoch: 0
   description: Initramfs generator using udev
   copyright:
@@ -27,7 +27,7 @@ pipeline:
     with:
       repository: https://github.com/dracut-ng/dracut-ng.git
       tag: ${{package.version}}
-      expected-commit: 279da16f1b8fcca27d41937967c4e8f4c295086a
+      expected-commit: 97c5568ec42abd5e6035f0cfa9d319ae6ae4e50a
 
   - uses: autoconf/configure
     with:

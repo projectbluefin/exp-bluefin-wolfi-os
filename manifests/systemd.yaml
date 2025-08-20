@@ -3,7 +3,7 @@
 package:
   name: systemd
   # 35712.patch can be dropped when 258 releases
-  version: "257.7"
+  version: "257.8"
   epoch: 1
   description: The systemd System and Service Manager
   copyright:
@@ -93,11 +93,7 @@ pipeline:
     with:
       repository: https://github.com/systemd/systemd
       tag: v${{package.version}}
-      expected-commit: 162e5e4a77931e4a7a7c9b6f86f09a70ec52a3e5
-
-  - uses: patch
-    with:
-      patches: patches/35712.patch
+      expected-commit: 5e38d199a623563698ab4a69acbbe3afa9135198
 
   - uses: meson/configure
     with:
