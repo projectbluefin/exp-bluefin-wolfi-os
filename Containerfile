@@ -53,7 +53,7 @@ FROM scratch
 COPY --from=builder /mnt /
 
 # Alter root file structure a bit for ostree
-RUN mkdir -p /boot && \
+RUN mkdir -p /boot /sysroot && \
     rm -rf /var/log /home /root /usr/local /srv && \
     ln -s /var/home /home && \
     ln -s /var/roothome /root && \

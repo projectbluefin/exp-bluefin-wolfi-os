@@ -1,0 +1,307 @@
+From 3f8ee3228698592922d4764c25b77b5506492940 Mon Sep 17 00:00:00 2001
+From: Robert Sturla <robertsturla@outlook.com>
+Date: Wed, 20 Aug 2025 17:09:23 +0100
+Subject: [PATCH] feat: support systemd-boot via config and build flag
+
+---
+ Cargo.toml                | 13 +++++++-
+ src/bootupd.rs            | 62 +++++++++++++++++++++++++++++++++++----
+ src/cli/bootupd.rs        | 21 +++++++++++--
+ src/efi.rs                | 20 +++++++++++--
+ src/main.rs               |  2 ++
+ src/systemdbootconfigs.rs | 42 ++++++++++++++++++++++++++
+ 6 files changed, 149 insertions(+), 11 deletions(-)
+ create mode 100644 src/systemdbootconfigs.rs
+
+diff --git a/Cargo.toml b/Cargo.toml
+index c3208f8..02b53c2 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -15,6 +15,10 @@ include = ["src", "LICENSE", "Makefile", "systemd"]
+ platforms = ["*-unknown-linux-gnu"]
+ tier = "2"
+
++[features]
++default = []
++systemd-boot = []
++
+ [[bin]]
+ name = "bootupd"
+ path = "src/main.rs"
+@@ -27,7 +31,14 @@ bootc-internal-utils = "0.0.0"
+ cap-std-ext = "4.0.6"
+ camino = "1.1.11"
+ chrono = { version = "0.4.41", features = ["serde"] }
+-clap = { version = "4.5", default-features = false, features = ["cargo", "derive", "std", "help", "usage", "suggestions"] }
++clap = { version = "4.5", default-features = false, features = [
++    "cargo",
++    "derive",
++    "std",
++    "help",
++    "usage",
++    "suggestions",
++] }
+ env_logger = "0.11"
+ fail = { version = "0.5", features = ["failpoints"] }
+ fn-error-context = "0.2.1"
+diff --git a/src/bootupd.rs b/src/bootupd.rs
+index 131548b..9ac7167 100644
+--- a/src/bootupd.rs
++++ b/src/bootupd.rs
+@@ -25,6 +25,14 @@ use std::fs::{self, File};
+ use std::io::{BufRead, BufReader, BufWriter, Write};
+ use std::path::{Path, PathBuf};
+
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++// TODO: Implement dynamic bootloader detection
++pub(crate) enum Bootloader {
++    _Auto,
++    Grub,
++    SystemdBoot,
++}
++
+ pub(crate) enum ConfigMode {
+     None,
+     Static,
+@@ -46,9 +54,10 @@ pub(crate) fn install(
+     dest_root: &str,
+     device: Option<&str>,
+     configs: ConfigMode,
+-    update_firmware: bool,
++    mut update_firmware: bool,
+     target_components: Option<&[String]>,
+     auto_components: bool,
++    bootloader: Bootloader,
+ ) -> Result<()> {
+     // TODO: Change this to an Option<&str>; though this probably balloons into having
+     // DeviceComponent and FileBasedComponent
+@@ -93,15 +102,34 @@ pub(crate) fn install(
+             continue;
+         }
+
++        // skip for BIOS if systemd-boot
++        if component.name() == "BIOS" && bootloader == Bootloader::SystemdBoot {
++            println!(
++                "Skip installing component {} for systemd-boot",
++                component.name()
++            );
++            continue;
++        }
++
++        if bootloader == Bootloader::SystemdBoot {
++            log::warn!(
++                "Disabling firmware updates for component {}",
++                component.name()
++            );
++            update_firmware = false;
++        }
+         let meta = component
+             .install(&source_root, dest_root, device, update_firmware)
+             .with_context(|| format!("installing component {}", component.name()))?;
+         log::info!("Installed {} {}", component.name(), meta.meta.version);
+         state.installed.insert(component.name().into(), meta);
+-        // Yes this is a hack...the Component thing just turns out to be too generic.
+-        if let Some(vendor) = component.get_efi_vendor(&source_root)? {
+-            assert!(installed_efi_vendor.is_none());
+-            installed_efi_vendor = Some(vendor);
++
++        if bootloader != Bootloader::SystemdBoot {
++            // Yes this is a hack...the Component thing just turns out to be too generic.
++            if let Some(vendor) = component.get_efi_vendor(&source_root)? {
++                assert!(installed_efi_vendor.is_none());
++                installed_efi_vendor = Some(vendor);
++            }
+         }
+     }
+     let sysroot = &openat::Dir::open(dest_root)?;
+@@ -116,10 +144,32 @@ pub(crate) fn install(
+                 target_arch = "powerpc64",
+                 target_arch = "riscv64"
+             ))]
++            log::warn!("Configuring grub2 with uuid {uuid}");
+             crate::grubconfigs::install(sysroot, installed_efi_vendor.as_deref(), uuid)?;
+             // On other architectures, assume that there's nothing to do.
+         }
+-        None => {}
++        None => {
++            log::info!("Skipping static config generation");
++        }
++    }
++
++    // Configure systemd-boot
++    // #[cfg(feature = "systemd-boot")]
++    if bootloader == Bootloader::SystemdBoot {
++        let efi = crate::efi::Efi::default();
++        log::info!("Installing systemd-boot");
++        // Use dest_root/boot as the root for ESP detection, matching conventions elsewhere
++        let boot_root = Path::new(dest_root).join("boot");
++        let esp_device = crate::blockdev::get_esp_partition(device)?
++            .ok_or_else(|| anyhow!("No ESP device found"))?;
++        let mnt = efi.ensure_mounted_esp(&boot_root, Path::new(&esp_device))?;
++        let esp_dir = openat::Dir::open(&mnt).context("Opening mounted ESP directory")?;
++        crate::systemdbootconfigs::install(&esp_dir)?;
++    } else {
++        anyhow::bail!(
++            "Failed to find mounted ESP for systemd-boot installation in {:?}.",
++            Path::new(dest_root).join("boot")
++        );
+     }
+
+     // Unmount the ESP, etc.
+diff --git a/src/cli/bootupd.rs b/src/cli/bootupd.rs
+index 4a6b8cf..fe21ba4 100644
+--- a/src/cli/bootupd.rs
++++ b/src/cli/bootupd.rs
+@@ -1,4 +1,4 @@
+-use crate::bootupd::{self, ConfigMode};
++use crate::bootupd::{self, Bootloader, ConfigMode};
+ use anyhow::{Context, Result};
+ use clap::Parser;
+ use log::LevelFilter;
+@@ -73,6 +73,12 @@ pub struct InstallOpts {
+     /// then only enable installation to the ESP.
+     #[clap(long)]
+     auto: bool,
++
++    /// The bootloader to configure
++    ///
++    /// Defaults to Grub
++    #[clap(long, default_value = "grub")]
++    bootloader: String,
+ }
+
+ #[derive(Debug, Parser)]
+@@ -103,13 +109,23 @@ impl DCommand {
+
+     /// Runner for `install` verb.
+     pub(crate) fn run_install(opts: InstallOpts) -> Result<()> {
+-        let configmode = if opts.write_uuid {
++        let bootloader = match opts.bootloader.as_str() {
++            "grub" => Bootloader::Grub,
++            "systemd-boot" => Bootloader::SystemdBoot,
++            _ => anyhow::bail!("Unknown bootloader: {}", opts.bootloader),
++        };
++
++        // If systemd-boot, always use ConfigMode::None
++        let configmode = if let Bootloader::SystemdBoot = bootloader {
++            ConfigMode::None
++        } else if opts.write_uuid {
+             ConfigMode::WithUUID
+         } else if opts.with_static_configs {
+             ConfigMode::Static
+         } else {
+             ConfigMode::None
+         };
++
+         bootupd::install(
+             &opts.src_root,
+             &opts.dest_root,
+@@ -118,6 +134,7 @@ impl DCommand {
+             opts.update_firmware,
+             opts.components.as_deref(),
+             opts.auto,
++            bootloader,
+         )
+         .context("boot data installation failed")?;
+         Ok(())
+diff --git a/src/efi.rs b/src/efi.rs
+index 61de605..41352c5 100644
+--- a/src/efi.rs
++++ b/src/efi.rs
+@@ -273,6 +273,7 @@ impl Component for Efi {
+                 .context("Failed to backup GRUB config")?;
+         }
+
++        log::warn!("Replacing grub.cfg in /boot/efi/EFI/{vendor} with static grub.cfg");
+         grubconfigs::install(&sysroot, Some(&vendor), true)?;
+         // Synchronize the filesystem containing /boot/efi/EFI/{vendor} to disk.
+         fsfreeze_thaw_cycle(efidir.open_file(".")?)?;
+@@ -343,8 +344,23 @@ impl Component for Efi {
+         device: &str,
+         update_firmware: bool,
+     ) -> Result<InstalledContent> {
+-        let Some(meta) = get_component_update(src_root, self)? else {
+-            anyhow::bail!("No update metadata for component {} found", self.name());
++        let meta = match get_component_update(src_root, self)? {
++            Some(meta) => meta,
++            None => {
++                log::debug!(
++                    "No update metadata for component {} found, continuing (systemd-boot case)",
++                    self.name()
++                );
++                // You may want to return a default InstalledContent or handle this case differently.
++                return Ok(InstalledContent {
++                    meta: ContentMetadata {
++                        timestamp: chrono::Utc::now(),
++                        version: "systemd-boot".to_string(),
++                    },
++                    filetree: None,
++                    adopted_from: None,
++                });
++            }
+         };
+         log::debug!("Found metadata {}", meta.version);
+         let srcdir_name = component_updatedirname(self);
+diff --git a/src/main.rs b/src/main.rs
+index 5554366..c769a9e 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -46,6 +46,8 @@ mod model_legacy;
+ mod ostreeutil;
+ mod packagesystem;
+ mod sha512string;
++#[cfg(feature = "systemd-boot")]
++mod systemdbootconfigs;
+ mod util;
+
+ use clap::crate_name;
+diff --git a/src/systemdbootconfigs.rs b/src/systemdbootconfigs.rs
+new file mode 100644
+index 0000000..a0bb7e8
+--- /dev/null
++++ b/src/systemdbootconfigs.rs
+@@ -0,0 +1,42 @@
++use std::path::Path;
++
++use anyhow::{Context, Result};
++use fn_error_context::context;
++
++/// Install files required for systemd-boot
++#[context("Installing systemd-boot")]
++pub(crate) fn install(esp_path: &openat::Dir) -> Result<()> {
++    let esp_path = esp_path.recover_path().context("ESP path is not valid")?;
++    let status = std::process::Command::new("bootctl")
++        .args([
++            "install",
++            "--esp-path",
++            esp_path.to_str().context("ESP path is not valid UTF-8")?,
++        ])
++        .status()
++        .context("Failed to execute bootctl")?;
++
++    if !status.success() {
++        anyhow::bail!(
++            "bootctl install failed with status code {}",
++            status.code().unwrap_or(-1)
++        );
++    }
++
++    // If loader.conf is present in the bootupd configuration, replace the original config with it
++    let src_loader_conf = "/usr/lib/bootupd/systemd-boot/loader.conf";
++    let dst_loader_conf = Path::new(&esp_path).join("loader/loader.conf");
++    if Path::new(src_loader_conf).exists() {
++        std::fs::copy(src_loader_conf, &dst_loader_conf)
++            .context("Failed to copy loader.conf to ESP")?;
++        log::info!(
++            "Copied {} to {}",
++            src_loader_conf,
++            dst_loader_conf.display()
++        );
++    } else {
++        log::warn!("{} does not exist, skipping copy", src_loader_conf);
++    }
++
++    Ok(())
++}
+--
+2.50.1

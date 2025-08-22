@@ -14,19 +14,19 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/coreos/bootupd
-      tag: v${{package.version}}
-      expected-commit: a3510c52e87eba210d0e3d5b548a768ef07574a1
+      repository: https://github.com/p5/coreos-bootupd.git
+      # tag: v${{package.version}}
+      branch: sdboot-support
+      expected-commit: 23d044ce9533823cf0dbf4168122b9c25d918df5
 
   - uses: cargo/build
     with:
       output: bootupd
+      opts: |
+        --release \
+        --features systemd-boot
 
   - uses: autoconf/make-install
-
-  - uses: autoconf/make
-    with:
-      opts: install-grub-static DESTDIR="${{targets.destdir}}"
 
   - uses: strip
 

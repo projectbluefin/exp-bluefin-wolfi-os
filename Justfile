@@ -86,4 +86,4 @@ generate-bootable-image:
     if [ ! -e ./bootable.img ] ; then
         fallocate -l 20G bootable.img
     fi
-    just bootc install to-disk --composefs-native --via-loopback /data/bootable.img --filesystem ext4 --wipe
+    just bootc install to-disk --composefs-native --via-loopback /data/bootable.img --filesystem ext4 --wipe --bootloader systemd-boot

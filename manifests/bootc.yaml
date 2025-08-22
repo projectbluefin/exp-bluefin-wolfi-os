@@ -5,6 +5,14 @@ package:
   description: Boot and upgrade via container images
   copyright:
     - license: Apache-2.0-only
+  dependencies:
+    runtime:
+      - fstrim
+      - ostree
+      - composefs
+      - mount
+      - umount
+      - util-linux-misc
 
 environment:
   contents:
@@ -14,9 +22,9 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/bootc-dev/bootc.git
-      branch: composefs-backend
-      expected-commit: 1a7ac13ef104c32e18c1e28fbee236bf061fc235
+      repository: https://github.com/rsturla/bootc.git
+      branch: systemd-boot
+      expected-commit: dc6020fb1bb2f02e528a3bacb1193c5437e04bb6
 
   - uses: cargo/build
     with:
