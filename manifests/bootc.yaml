@@ -24,7 +24,7 @@ pipeline:
     with:
       repository: https://github.com/rsturla/bootc.git
       branch: systemd-boot
-      expected-commit: dc6020fb1bb2f02e528a3bacb1193c5437e04bb6
+      expected-commit: 923ec99f4e55d7a16fc3d0b5624a0a2772bb39c2
 
   - uses: cargo/build
     with:
