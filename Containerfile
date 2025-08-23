@@ -60,5 +60,9 @@ RUN mkdir -p /boot /sysroot && \
     ln -s /var/usrlocal /usr/local && \
     ln -s /var/srv /srv
 
+# Setup a temporary root passwd (changeme) for dev purposes
+# TODO: Replace this for a more robust option when in prod
+RUN usermod -p '$6$AJv9RHlhEXO6Gpul$5fvVTZXeM0vC03xckTIjY8rdCofnkKSzvF5vEzXDKAby5p3qaOGTHDypVVxKsCE3CbZz7C3NXnbpITrEUvN/Y/' root
+
 # Necessary labels
 LABEL containers.bootc 1

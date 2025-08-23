@@ -40,6 +40,11 @@ environment:
       - openssl
       - composefs-rs-dracut
       - util-linux-login
+      - mount
+      - umount
+      - blkid
+      - losetup
+
 
 pipeline:
   - runs: |
