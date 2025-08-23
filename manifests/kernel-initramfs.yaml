@@ -29,6 +29,7 @@ environment:
       - zstd
       - posix-libc-utils
       - attr
+      - findutils
       # For modules
       - lvm2
       - cryptsetup
@@ -38,6 +39,7 @@ environment:
       - device-mapper
       - openssl
       - composefs-rs-dracut
+      - util-linux-login
 
 pipeline:
   - runs: |
