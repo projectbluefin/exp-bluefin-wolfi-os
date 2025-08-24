@@ -1,0 +1,54 @@
+From 49326238bbc7b3e441050647b023c4032139dde7 Mon Sep 17 00:00:00 2001
+From: Robert Sturla <robertsturla@outlook.com>
+Date: Sun, 24 Aug 2025 17:49:05 +0100
+Subject: [PATCH] install: pass through bootupd bootloader args
+
+Signed-off-by: Robert Sturla <robertsturla@outlook.com>
+---
+ crates/lib/src/bootloader.rs | 9 +++++++++
+ crates/lib/src/install.rs    | 4 ++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/crates/lib/src/bootloader.rs b/crates/lib/src/bootloader.rs
+index 0f02198a..93fb7a30 100644
+--- a/crates/lib/src/bootloader.rs
++++ b/crates/lib/src/bootloader.rs
+@@ -28,12 +28,21 @@ pub(crate) fn install_via_bootupd(
+     } else {
+         vec![]
+     };
++
++    // If configopts.bootloader is systemd-boot, pass in the `--bootloader systemd-boot` flag to bootupctl
++    let mut bootloader_args = vec![];
++    if configopts.bootloader == Some("systemd-boot".into()) {
++        bootloader_args.push("--bootloader");
++        bootloader_args.push("systemd-boot");
++    }
++
+     let devpath = device.path();
+     println!("Installing bootloader via bootupd");
+     Command::new("bootupctl")
+         .args(["backend", "install", "--write-uuid"])
+         .args(verbose)
+         .args(bootupd_opts.iter().copied().flatten())
++        .args(bootloader_args)
+         .args(src_root_arg)
+         .args(["--device", devpath.as_str(), rootfs.as_str()])
+         .log_debug()
+diff --git a/crates/lib/src/install.rs b/crates/lib/src/install.rs
+index c058768f..7e313960 100644
+--- a/crates/lib/src/install.rs
++++ b/crates/lib/src/install.rs
+@@ -252,6 +252,10 @@ pub(crate) struct InstallConfigOpts {
+     /// The stateroot name to use. Defaults to `default`.
+     #[clap(long)]
+     pub(crate) stateroot: Option<String>,
++
++    /// The bootloader to use
++    #[clap(long)]
++    pub(crate) bootloader: Option<String>,
+ }
+
+ #[derive(
+--
+2.50.1

@@ -23,8 +23,12 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/rsturla/bootc.git
-      branch: systemd-boot
-      expected-commit: 923ec99f4e55d7a16fc3d0b5624a0a2772bb39c2
+      branch: composefs-backend-boot-assets-to-esp
+      expected-commit: 4fcc336091c8f827cc91a8cc79499b2a7fc0ede4
+
+  - uses: patch
+    with:
+      patches: 0001-install-pass-through-bootupd-bootloader-args.patch
 
   - uses: cargo/build
     with:
