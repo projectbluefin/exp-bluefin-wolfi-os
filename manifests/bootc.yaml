@@ -24,7 +24,7 @@ pipeline:
     with:
       repository: https://github.com/rsturla/bootc.git
       branch: composefs-backend-boot-assets-to-esp
-      expected-commit: 4fcc336091c8f827cc91a8cc79499b2a7fc0ede4
+      expected-commit: 3d582808e6a0a9ab663d239ec6250bc1aa99f584
 
   - uses: patch
     with:
