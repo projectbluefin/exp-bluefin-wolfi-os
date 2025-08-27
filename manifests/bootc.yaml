@@ -22,7 +22,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/rsturla/bootc.git
+      repository: https://github.com/bootc-dev/bootc.git
       branch: composefs-backend
       expected-commit: 54e254cf1dc4925285f717353dc769b345ba149e
 
