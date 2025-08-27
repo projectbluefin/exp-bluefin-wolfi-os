@@ -1,17 +1,59 @@
 contents:
   packages:
-    - apk-tools
-    - ca-certificates-bundle
-    - kernel-uki
-    - systemd
-    - bootc
-    # - podman # https://github.com/wolfi-dev/os/issues/60292
-    - skopeo
-    - bash
+    # Base system
+    - wolfi-base
+    - bootc-baselayout
+    - posix-libc-utils
     - coreutils
-    - merged-bin
-    - file
+    - glib
+    - shadow
+
+    # Init and system services
+    - systemd
+    - systemd-init
+    - systemd-logind-service
+    - systemd-boot
+    - dbus
+    - dbus-glib
+    - udev
+
+    # Kernel and boot
+    - kernel
+    - kernel-modules
+    - kernel-initramfs
+    - bootc
+    - bootupd
+    - ostree
+    - composefs
+
+    # Storage and filesystems
     - btrfs-progs
+    - e2fsprogs
+    - xfsprogs
+    - dosfstools
+    - sfdisk
+    - wipefs
+    - losetup
+    - findmnt
+    - lsblk
+    - cpio
+    - zstd
+
+    # Utilities and toolchain
+    - binutils
+    - util-linux-login
+
+    # Containers
+    - conmon
+    - crun
+    - netavark
+    - skopeo
+
+    # Security
+    - libselinux
+
+    # Debugging / tracing
+    - strace
 
 archs:
   - x86_64
@@ -19,3 +61,6 @@ archs:
 layering:
   strategy: origin
   budget: 50
+
+annotations:
+  containers.bootable: 1
