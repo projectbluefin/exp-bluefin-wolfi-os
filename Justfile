@@ -60,14 +60,14 @@ build-containerfile:
     sudo podman build \
         -t wolfi-bootc:latest .
 
-build-apko $yaml="apko.yaml" $tag="wolfi-bootc:latest" $tar="wolfi-bootc.tar":
+build-apko $yaml="apko.yaml" $tag="wolfi-bootc:latest":
     mkdir -p ./output/oci
     apko build $APKO_OPTS \
         --repository-append "./packages" \
         --keyring-append "./${SIGNING_KEY_PATH}.pub" \
         --sbom-path ./output/oci \
-        "${yaml}" "${tag}" ./output/oci/"${tar}"
-    sudo podman load < ./output/oci/"${tar}"
+        "${yaml}" "${tag}" ./output/oci/
+    sudo skopeo copy oci:./output/oci/ containers-storage:${tag}
 
 bootc *ARGS:
     sudo podman run \
