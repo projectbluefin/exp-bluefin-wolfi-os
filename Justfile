@@ -32,8 +32,8 @@ build $package="":
         --keyring-append "./${SIGNING_KEY_PATH}.pub" \
         --signing-key "./${SIGNING_KEY_PATH}" \
         --apk-cache-dir "./.cache/apk-cache" \
-        --cache-dir "./.cache/melange" \
-        --workspace-dir "./.cache/workspace" \
+        --cache-dir "./.cache/melange/${package}" \
+        --workspace-dir "./.cache/workspace/${package}" \
         --runner "${MELANGE_RUNNER}"
 
 build-tree:
