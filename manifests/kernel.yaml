@@ -69,6 +69,7 @@ subpackages:
     dependencies:
       runtime:
         - xz
+        - kmod
     pipeline:
       - uses: autoconf/make
         with:
@@ -85,6 +86,12 @@ subpackages:
               print "%s" "Found uncompressed kernel object files" >&2
               exit 1
             fi
+
+            echo "Generating module dependency cache with depmod..."
+            # Run depmod against the staging directory where modules were installed
+            # Use -b (basedir) to specify the root of the module tree
+            # This creates modules.dep, modules.alias, etc., within ${{targets.subpkgdir}}/usr/lib/modules/${{package.version}}/
+            depmod -a -b "${{targets.subpkgdir}}/usr" "${{package.version}}"
 
   - name: kernel-dev
     description: Kernel headers
